@@ -10,19 +10,47 @@ WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", 
 MONTHS = {name.lower(): i for i, name in enumerate(calendar.month_name) if name}
 MONTHS |= {name.lower(): i for i, name in enumerate(calendar.month_abbr) if name}
 ORDINALS = {
-    "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "sixth": 6, "seventh": 7,
-    "eighth": 8, "ninth": 9, "tenth": 10, "eleventh": 11, "twelfth": 12, "thirteenth": 13,
-    "fourteenth": 14, "fifteenth": 15, "sixteenth": 16, "seventeenth": 17, "eighteenth": 18,
-    "nineteenth": 19, "twentieth": 20, "twenty-first": 21, "twenty first": 21,
-    "twenty-second": 22, "twenty second": 22, "twenty-third": 23, "twenty third": 23,
-    "twenty-fourth": 24, "twenty fourth": 24, "twenty-fifth": 25, "twenty fifth": 25,
-    "thirtieth": 30, "thirty-first": 31, "thirty first": 31,
+    "first": 1,
+    "second": 2,
+    "third": 3,
+    "fourth": 4,
+    "fifth": 5,
+    "sixth": 6,
+    "seventh": 7,
+    "eighth": 8,
+    "ninth": 9,
+    "tenth": 10,
+    "eleventh": 11,
+    "twelfth": 12,
+    "thirteenth": 13,
+    "fourteenth": 14,
+    "fifteenth": 15,
+    "sixteenth": 16,
+    "seventeenth": 17,
+    "eighteenth": 18,
+    "nineteenth": 19,
+    "twentieth": 20,
+    "twenty-first": 21,
+    "twenty first": 21,
+    "twenty-second": 22,
+    "twenty second": 22,
+    "twenty-third": 23,
+    "twenty third": 23,
+    "twenty-fourth": 24,
+    "twenty fourth": 24,
+    "twenty-fifth": 25,
+    "twenty fifth": 25,
+    "thirtieth": 30,
+    "thirty-first": 31,
+    "thirty first": 31,
 }
 NUMBERS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "a": 1, "an": 1}
 
-_DAY = r"(?P<day>\d{1,2})(?:st|nd|rd|th)?|(?P<oday>" + "|".join(
-    sorted(map(re.escape, ORDINALS), key=len, reverse=True)
-) + ")"
+_DAY = (
+    r"(?P<day>\d{1,2})(?:st|nd|rd|th)?|(?P<oday>"
+    + "|".join(sorted(map(re.escape, ORDINALS), key=len, reverse=True))
+    + ")"
+)
 _MONTH = "(?P<month>" + "|".join(sorted(MONTHS, key=len, reverse=True)) + r")\.?"
 
 PATTERNS: list[tuple[str, re.Pattern[str]]] = [
@@ -32,10 +60,34 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("tomorrow", re.compile(r"\b(?:by |before |until )?tomorrow\b", re.I)),
     ("today", re.compile(r"\b(?:by |before )?(?:today|tonight)\b", re.I)),
     ("next_week", re.compile(r"\b(?:by |before |until )?next week\b", re.I)),
-    ("in_n", re.compile(r"\b(?:with)?in (?P<n>\d+|one|two|three|four|five|six|a|an) (?P<unit>days?|weeks?)\b", re.I)),
-    ("weekday", re.compile(r"\b(?:by |before |until |on |this )?(?P<next>next )?(?P<wd>" + "|".join(WEEKDAYS) + r")\b", re.I)),
-    ("month_day", re.compile(r"\b(?:by |before |until |on )?" + _MONTH + r"\s+(?:the\s+)?(?:" + _DAY + r")\b", re.I)),
-    ("day_month", re.compile(r"\b(?:by |before |until |on )?(?:the\s+)?(?:" + _DAY + r")\s+(?:of\s+)?" + _MONTH, re.I)),
+    (
+        "in_n",
+        re.compile(
+            r"\b(?:with)?in (?P<n>\d+|one|two|three|four|five|six|a|an) (?P<unit>days?|weeks?)\b",
+            re.I,
+        ),
+    ),
+    (
+        "weekday",
+        re.compile(
+            r"\b(?:by |before |until |on |this )?(?P<next>next )?(?P<wd>"
+            + "|".join(WEEKDAYS)
+            + r")\b",
+            re.I,
+        ),
+    ),
+    (
+        "month_day",
+        re.compile(
+            r"\b(?:by |before |until |on )?" + _MONTH + r"\s+(?:the\s+)?(?:" + _DAY + r")\b", re.I
+        ),
+    ),
+    (
+        "day_month",
+        re.compile(
+            r"\b(?:by |before |until |on )?(?:the\s+)?(?:" + _DAY + r")\s+(?:of\s+)?" + _MONTH, re.I
+        ),
+    ),
 ]
 
 

@@ -11,7 +11,9 @@ def _overlap(a0: float, a1: float, b0: float, b1: float) -> float:
     return max(0.0, min(a1, b1) - max(a0, b0))
 
 
-def assign_speakers(pieces: list[TranscriptPiece], turns: list[SpeakerTurn]) -> list[LabelledSegment]:
+def assign_speakers(
+    pieces: list[TranscriptPiece], turns: list[SpeakerTurn]
+) -> list[LabelledSegment]:
     """Label each transcript piece with the diarization speaker it overlaps most.
 
     Pieces with no overlapping turn inherit the temporally nearest turn's speaker. When
@@ -37,7 +39,9 @@ def assign_speakers(pieces: list[TranscriptPiece], turns: list[SpeakerTurn]) -> 
     return out
 
 
-def speaker_name_hints(pieces: list[TranscriptPiece], segments: list[LabelledSegment]) -> dict[str, str]:
+def speaker_name_hints(
+    pieces: list[TranscriptPiece], segments: list[LabelledSegment]
+) -> dict[str, str]:
     """If the sidecar transcript carried speaker names, map diarized labels to them by majority vote."""
     votes: dict[str, Counter[str]] = defaultdict(Counter)
     ordered = sorted(pieces, key=lambda p: p.start)

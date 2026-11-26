@@ -20,7 +20,9 @@ def workspace_usage(db: Session, workspace_id: str, days: int = 30) -> dict[str,
     since = datetime.now(UTC) - timedelta(days=days)
     events = list(
         db.scalars(
-            select(UsageEvent).where(UsageEvent.workspace_id == workspace_id, UsageEvent.created_at >= since)
+            select(UsageEvent).where(
+                UsageEvent.workspace_id == workspace_id, UsageEvent.created_at >= since
+            )
         )
     )
     meetings = list(
@@ -42,7 +44,9 @@ def workspace_usage(db: Session, workspace_id: str, days: int = 30) -> dict[str,
     stage_totals: dict[str, float] = defaultdict(float)
     for m in meetings:
         if m.processing_started_at and m.processing_finished_at:
-            secs = (_aware(m.processing_finished_at) - _aware(m.processing_started_at)).total_seconds()
+            secs = (
+                _aware(m.processing_finished_at) - _aware(m.processing_started_at)
+            ).total_seconds()
             proc_times.append(secs)
             if m.duration_s:
                 rtf.append(secs / m.duration_s)
@@ -62,7 +66,13 @@ def workspace_usage(db: Session, workspace_id: str, days: int = 30) -> dict[str,
             daily[d]["meetings"] += 1 if e.kind == UsageKind.STT else 0
 
     by_provider: dict[tuple[str, str], dict[str, float]] = defaultdict(
-        lambda: {"events": 0, "input_tokens": 0, "output_tokens": 0, "audio_minutes": 0.0, "cost_usd": 0.0}
+        lambda: {
+            "events": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "audio_minutes": 0.0,
+            "cost_usd": 0.0,
+        }
     )
     for e in events:
         row = by_provider[(e.kind.value, e.provider)]
@@ -84,9 +94,13 @@ def workspace_usage(db: Session, workspace_id: str, days: int = 30) -> dict[str,
             "llm_output_tokens": sum(e.output_tokens for e in llm),
             "cost_usd": round(sum(e.cost_usd for e in events), 4),
             "projected_hosted_cost_usd": round(sum(e.projected_cost_usd for e in events), 4),
-            "cost_per_meeting_usd": round(sum(e.cost_usd for e in events) / len(meetings), 4) if meetings else 0.0,
+            "cost_per_meeting_usd": round(sum(e.cost_usd for e in events) / len(meetings), 4)
+            if meetings
+            else 0.0,
         },
-        "daily": [{"date": d, **{k: round(v, 4) for k, v in vals.items()}} for d, vals in daily.items()],
+        "daily": [
+            {"date": d, **{k: round(v, 4) for k, v in vals.items()}} for d, vals in daily.items()
+        ],
         "by_provider": [
             {"kind": k, "provider": p, **{key: round(v, 4) for key, v in vals.items()}}
             for (k, p), vals in sorted(by_provider.items())

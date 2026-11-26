@@ -28,7 +28,9 @@ def create_user_with_workspace(db: Session, *, email: str, name: str, password: 
     email = email.strip().lower()
     if db.scalar(select(User).where(User.email == email)):
         raise ConflictError("An account with this email already exists")
-    user = User(email=email, name=name.strip(), password_hash=hash_password(password) if password else None)
+    user = User(
+        email=email, name=name.strip(), password_hash=hash_password(password) if password else None
+    )
     db.add(user)
     db.flush()
     workspace = Workspace(name=f"{user.name.split(' ')[0]}'s workspace")
@@ -49,7 +51,9 @@ def authenticate(db: Session, email: str, password: str) -> User:
     return user
 
 
-def issue_tokens(db: Session, user: User, user_agent: str | None = None, family: str | None = None) -> tuple[str, str]:
+def issue_tokens(
+    db: Session, user: User, user_agent: str | None = None, family: str | None = None
+) -> tuple[str, str]:
     settings = get_settings()
     fam = family or new_id()
     refresh, jti, expires = create_token(
@@ -69,7 +73,9 @@ def issue_tokens(db: Session, user: User, user_agent: str | None = None, family:
     return create_access_token(user.id), refresh
 
 
-def rotate_refresh_token(db: Session, token: str, user_agent: str | None = None) -> tuple[User, str, str]:
+def rotate_refresh_token(
+    db: Session, token: str, user_agent: str | None = None
+) -> tuple[User, str, str]:
     claims = decode_token(token, "refresh")
     record = db.scalar(select(RefreshToken).where(RefreshToken.jti == claims["jti"]))
     if record is None:

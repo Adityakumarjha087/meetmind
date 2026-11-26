@@ -80,7 +80,11 @@ def read_wav(path: Path) -> AudioData:
         data = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768.0
     elif width == 3:
         b = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 3)
-        ints = (b[:, 0].astype(np.int32) | (b[:, 1].astype(np.int32) << 8) | (b[:, 2].astype(np.int32) << 16))
+        ints = (
+            b[:, 0].astype(np.int32)
+            | (b[:, 1].astype(np.int32) << 8)
+            | (b[:, 2].astype(np.int32) << 16)
+        )
         ints = np.where(ints & 0x800000, ints - 0x1000000, ints)
         data = ints.astype(np.float32) / 8388608.0
     elif width == 4:
@@ -107,7 +111,7 @@ def resample(audio: AudioData, rate: int) -> AudioData:
     if audio.sample_rate == rate or len(audio.samples) == 0:
         return AudioData(audio.samples, rate if len(audio.samples) == 0 else audio.sample_rate)
     duration = audio.duration_s
-    n_out = int(round(duration * rate))
+    n_out = round(duration * rate)
     x_old = np.linspace(0.0, duration, num=len(audio.samples), endpoint=False)
     x_new = np.linspace(0.0, duration, num=n_out, endpoint=False)
     out = np.interp(x_new, x_old, audio.samples).astype(np.float32)

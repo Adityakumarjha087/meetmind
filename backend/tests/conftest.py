@@ -58,7 +58,9 @@ def client() -> Iterator[TestClient]:
         yield c
 
 
-def register(client: TestClient, email: str = "owner@example.com", name: str = "Olivia Owner") -> dict[str, str]:
+def register(
+    client: TestClient, email: str = "owner@example.com", name: str = "Olivia Owner"
+) -> dict[str, str]:
     resp = client.post(
         "/api/v1/auth/register", json={"email": email, "name": name, "password": "correct-horse-1"}
     )

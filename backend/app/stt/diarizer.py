@@ -128,7 +128,9 @@ def _reassign_short(labels: list[int], windows: list[Window], min_cluster_s: flo
     return out
 
 
-def to_turns(labels: list[int], windows: list[Window], merge_gap_s: float = 1.0) -> list[SpeakerTurn]:
+def to_turns(
+    labels: list[int], windows: list[Window], merge_gap_s: float = 1.0
+) -> list[SpeakerTurn]:
     order: dict[int, int] = {}
     for lab in labels:
         order.setdefault(lab, len(order))

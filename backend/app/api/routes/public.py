@@ -20,7 +20,9 @@ def shared_meeting(token: str, db: DB) -> PublicMeetingOut:
     meeting = db.scalar(select(Meeting).where(Meeting.share_token == token))
     if meeting is None:
         raise NotFoundError("Shared meeting not found")
-    items = db.scalars(select(ActionItem).where(ActionItem.meeting_id == meeting.id).order_by(ActionItem.position))
+    items = db.scalars(
+        select(ActionItem).where(ActionItem.meeting_id == meeting.id).order_by(ActionItem.position)
+    )
     return PublicMeetingOut(
         title=meeting.title,
         created_at=meeting.created_at,

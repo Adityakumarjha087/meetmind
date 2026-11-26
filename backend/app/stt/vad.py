@@ -60,6 +60,8 @@ def detect_speech(
     for s, e in merged:
         if e - s >= min_speech_s:
             out.append(
-                SpeechRegion(max(0.0, round(s - pad_s, 3)), min(audio.duration_s, round(e + pad_s, 3)))
+                SpeechRegion(
+                    max(0.0, round(s - pad_s, 3)), min(audio.duration_s, round(e + pad_s, 3))
+                )
             )
     return out

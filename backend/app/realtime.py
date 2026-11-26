@@ -48,7 +48,9 @@ def _member_workspace(user_id: str, meeting_id: str | None, workspace_id: str | 
 
 def register_handlers(sio: socketio.AsyncServer) -> None:
     @sio.event
-    async def connect(sid: str, environ: dict[str, Any], auth: dict[str, Any] | None = None) -> None:
+    async def connect(
+        sid: str, environ: dict[str, Any], auth: dict[str, Any] | None = None
+    ) -> None:
         token = (auth or {}).get("token")
         if not token:
             raise socketio.exceptions.ConnectionRefusedError("authentication required")
@@ -63,7 +65,9 @@ def register_handlers(sio: socketio.AsyncServer) -> None:
         session = await sio.get_session(sid)
         meeting_id = data.get("meeting_id") if isinstance(data, dict) else None
         workspace_id = data.get("workspace_id") if isinstance(data, dict) else None
-        ws = await asyncio.to_thread(_member_workspace, session["user_id"], meeting_id, workspace_id)
+        ws = await asyncio.to_thread(
+            _member_workspace, session["user_id"], meeting_id, workspace_id
+        )
         if ws is None:
             return {"ok": False, "error": "forbidden"}
         room = f"meeting:{meeting_id}" if meeting_id else f"workspace:{ws}"

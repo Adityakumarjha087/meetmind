@@ -123,12 +123,18 @@ class LLMEngine:
         self.max_tokens = max_tokens
         self.name = f"{model.provider}:{model.model}"
 
-    def _call_json(self, system: str, prompt: str, schema: dict[str, Any]) -> tuple[dict[str, Any], list[Completion]]:
+    def _call_json(
+        self, system: str, prompt: str, schema: dict[str, Any]
+    ) -> tuple[dict[str, Any], list[Completion]]:
         calls: list[Completion] = []
         last_error = ""
         for attempt in range(2):
-            p = prompt if attempt == 0 else (
-                f"{prompt}\n\nYour previous reply was invalid ({last_error}). Reply with JSON only."
+            p = (
+                prompt
+                if attempt == 0
+                else (
+                    f"{prompt}\n\nYour previous reply was invalid ({last_error}). Reply with JSON only."
+                )
             )
             completion = self.model.complete(
                 system=system, prompt=p, json_schema=schema, max_tokens=self.max_tokens
@@ -177,7 +183,8 @@ class LLMEngine:
 
     def reduce(self, data: AnalysisInput, partials: list[Insights]) -> AnalysisResult:
         sections = "\n\n".join(
-            f"## Section {i + 1}\n" + p.model_dump_json(exclude={"strategy", "chunks_processed", "engine"})
+            f"## Section {i + 1}\n"
+            + p.model_dump_json(exclude={"strategy", "chunks_processed", "engine"})
             for i, p in enumerate(partials)
         )
         prompt = (
@@ -194,7 +201,7 @@ class LLMEngine:
         if not contexts:
             return AnswerResult("I couldn't find anything about that in your meetings.", [])
         excerpts = "\n\n".join(
-            f"[{c.index}] Meeting \"{c.meeting_title}\" at {fmt_ts(c.start_s)}-{fmt_ts(c.end_s)} "
+            f'[{c.index}] Meeting "{c.meeting_title}" at {fmt_ts(c.start_s)}-{fmt_ts(c.end_s)} '
             f"({', '.join(c.speakers)}):\n{c.text}"
             for c in contexts
         )
@@ -202,7 +209,9 @@ class LLMEngine:
             ANSWER_SYSTEM, f"Excerpts:\n{excerpts}\n\nQuestion: {question}", ANSWER_SCHEMA
         )
         valid = {c.index for c in contexts}
-        cited = sorted({int(i) for i in raw.get("citations", []) if isinstance(i, int) and i in valid})
+        cited = sorted(
+            {int(i) for i in raw.get("citations", []) if isinstance(i, int) and i in valid}
+        )
         return AnswerResult(str(raw.get("answer", "")).strip(), cited, [_usage(c) for c in calls])
 
 
@@ -229,6 +238,8 @@ def _attach_talk_time(insights: Insights, data: AnalysisInput) -> Insights:
     for speaker in sorted(talk, key=lambda sp: -talk[sp]):
         base = by_name.get(speaker) or SpeakerSentiment(speaker=speaker, score=0.0, label="neutral")
         merged.append(
-            base.model_copy(update={"talk_time_s": round(talk[speaker], 2), "word_count": wc[speaker]})
+            base.model_copy(
+                update={"talk_time_s": round(talk[speaker], 2), "word_count": wc[speaker]}
+            )
         )
     return insights.model_copy(update={"sentiment": merged})

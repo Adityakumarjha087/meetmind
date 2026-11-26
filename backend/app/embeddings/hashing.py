@@ -7,6 +7,7 @@ lexical-retrieval fallback that keeps pgvector search working without any model 
 from __future__ import annotations
 
 import hashlib
+import itertools
 import math
 
 from app.intelligence.text import content_terms
@@ -23,7 +24,7 @@ class HashingEmbedder:
         feats: dict[str, float] = {}
         for t in terms:
             feats[t] = feats.get(t, 0.0) + 1.0
-        for a, b in zip(terms, terms[1:], strict=False):
+        for a, b in itertools.pairwise(terms):
             key = f"{a}_{b}"
             feats[key] = feats.get(key, 0.0) + 0.5
         return feats

@@ -42,7 +42,9 @@ def build_chat_model(settings: Settings) -> ChatModel | None:
     if provider == "ollama":
         from app.llm.http_providers import OllamaChatModel
 
-        return OllamaChatModel(settings.ollama_base_url, settings.llm_model or settings.ollama_model)
+        return OllamaChatModel(
+            settings.ollama_base_url, settings.llm_model or settings.ollama_model
+        )
     return None
 
 

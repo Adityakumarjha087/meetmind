@@ -25,7 +25,9 @@ def _check_assignee(db: DB, workspace_id: str, assignee_id: str | None) -> None:
     if assignee_id is None:
         return
     member = db.scalar(
-        select(Membership).where(Membership.workspace_id == workspace_id, Membership.user_id == assignee_id)
+        select(Membership).where(
+            Membership.workspace_id == workspace_id, Membership.user_id == assignee_id
+        )
     )
     if member is None:
         raise ValidationFailed("Assignee must be a member of this workspace")
@@ -52,8 +54,12 @@ def list_items(
     return [_out(i) for i in rows]
 
 
-@router.post("/workspaces/{workspace_id}/action-items", response_model=ActionItemOut, status_code=201)
-def create_item(workspace_id: str, body: ActionItemCreate, user: CurrentUser, db: DB) -> ActionItemOut:
+@router.post(
+    "/workspaces/{workspace_id}/action-items", response_model=ActionItemOut, status_code=201
+)
+def create_item(
+    workspace_id: str, body: ActionItemCreate, user: CurrentUser, db: DB
+) -> ActionItemOut:
     require_role(db, user, workspace_id, Role.MEMBER)
     _check_assignee(db, workspace_id, body.assignee_id)
     if body.meeting_id:
@@ -65,7 +71,9 @@ def create_item(workspace_id: str, body: ActionItemCreate, user: CurrentUser, db
             ActionItem.workspace_id == workspace_id, ActionItem.status == body.status
         )
     )
-    item = ActionItem(workspace_id=workspace_id, position=(max_pos or 0.0) + 1.0, **body.model_dump())
+    item = ActionItem(
+        workspace_id=workspace_id, position=(max_pos or 0.0) + 1.0, **body.model_dump()
+    )
     db.add(item)
     db.commit()
     db.refresh(item)

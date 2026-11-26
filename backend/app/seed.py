@@ -1,6 +1,6 @@
 """Idempotent demo seed: users, a team workspace and three fully processed meetings.
 
-    python -m app.seed
+python -m app.seed
 """
 
 from __future__ import annotations
@@ -34,10 +34,12 @@ from app.services.synth import synthesize
 log = get_logger("meetmind.seed")
 SEED_DIR = Path(__file__).resolve().parent / "seed_data"
 DEMO_EMAIL = "demo@meetmind.dev"
-DEMO_PASSWORD = "meetmind-demo"
+DEMO_PASSWORD = "meetmind-demo"  # noqa: S105
 
 
-def _add_meeting(workspace_id: str, user_id: str, title: str, when: datetime, audio: Path, sidecar: Path | None) -> str:
+def _add_meeting(
+    workspace_id: str, user_id: str, title: str, when: datetime, audio: Path, sidecar: Path | None
+) -> str:
     storage = get_storage()
     with session_scope() as db:
         meeting = Meeting(
@@ -66,21 +68,36 @@ def seed() -> bool:
         if db.scalar(select(User).where(User.email == DEMO_EMAIL)):
             log.info("seed_skipped", reason="demo user exists")
             return False
-        demo = create_user_with_workspace(db, email=DEMO_EMAIL, name="Demo User", password=DEMO_PASSWORD)
+        demo = create_user_with_workspace(
+            db, email=DEMO_EMAIL, name="Demo User", password=DEMO_PASSWORD
+        )
         ws = db.scalars(select(Membership).where(Membership.user_id == demo.id)).one().workspace
         ws.name = "Acme Product Team"
-        alex = create_user_with_workspace(db, email="alex@meetmind.dev", name="Alex Rivera", password=DEMO_PASSWORD)
-        vic = create_user_with_workspace(db, email="viewer@meetmind.dev", name="Vic Viewer", password=DEMO_PASSWORD)
+        alex = create_user_with_workspace(
+            db, email="alex@meetmind.dev", name="Alex Rivera", password=DEMO_PASSWORD
+        )
+        vic = create_user_with_workspace(
+            db, email="viewer@meetmind.dev", name="Vic Viewer", password=DEMO_PASSWORD
+        )
         db.add(Membership(workspace_id=ws.id, user_id=alex.id, role=Role.MEMBER))
         db.add(Membership(workspace_id=ws.id, user_id=vic.id, role=Role.VIEWER))
         ws_id, demo_id, alex_id = ws.id, demo.id, alex.id
 
     now = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
-    launch = _add_meeting(ws_id, demo_id, "Q3 Launch Planning", now - timedelta(days=1, hours=3),
-                          SEED_DIR / "demo_meeting.wav", None)
+    launch = _add_meeting(
+        ws_id,
+        demo_id,
+        "Q3 Launch Planning",
+        now - timedelta(days=1, hours=3),
+        SEED_DIR / "demo_meeting.wav",
+        None,
+    )
     with tempfile.TemporaryDirectory() as tmp:
         for i, (name, title, days) in enumerate(
-            [("weekly_engineering_sync", "Weekly Engineering Sync", 3), ("customer_feedback_review", "Customer Feedback Review", 6)]
+            [
+                ("weekly_engineering_sync", "Weekly Engineering Sync", 3),
+                ("customer_feedback_review", "Customer Feedback Review", 6),
+            ]
         ):
             sidecar = SEED_DIR / f"{name}.json"
             audio = Path(tmp) / f"{name}.wav"
@@ -92,7 +109,13 @@ def seed() -> bool:
         if meeting is not None:
             for speaker, name in zip(meeting.speakers, ["Priya", "Marcus", "Raj"], strict=False):
                 rename_speaker(db, meeting, speaker.id, name)
-        items = list(db.scalars(select(ActionItem).where(ActionItem.workspace_id == ws_id).order_by(ActionItem.created_at)))
+        items = list(
+            db.scalars(
+                select(ActionItem)
+                .where(ActionItem.workspace_id == ws_id)
+                .order_by(ActionItem.created_at)
+            )
+        )
         if len(items) >= 3:
             items[0].status = ActionStatus.IN_PROGRESS
             items[0].assignee_id = alex_id

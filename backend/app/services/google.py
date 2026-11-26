@@ -34,7 +34,10 @@ def authorization_url(link_user_id: str | None = None) -> str:
     _require_enabled()
     settings = get_settings()
     state, _, _ = create_token(
-        link_user_id or "anonymous", "oauth_state", timedelta(minutes=10), {"link": bool(link_user_id)}
+        link_user_id or "anonymous",
+        "oauth_state",
+        timedelta(minutes=10),
+        {"link": bool(link_user_id)},
     )
     params = {
         "client_id": settings.google_client_id,
@@ -72,7 +75,11 @@ def exchange_code(db: Session, code: str, state: str) -> User:
     _require_enabled()
     claims = decode_token(state, "oauth_state")
     tokens = _token_request(
-        {"code": code, "grant_type": "authorization_code", "redirect_uri": get_settings().google_redirect_uri}
+        {
+            "code": code,
+            "grant_type": "authorization_code",
+            "redirect_uri": get_settings().google_redirect_uri,
+        }
     )
     try:
         with http.client() as c:
@@ -101,12 +108,16 @@ def exchange_code(db: Session, code: str, state: str) -> User:
             select(User).where(User.email == email)
         )
         if user is None:
-            user = create_user_with_workspace(db, email=email, name=profile.get("name") or email, password=None)
+            user = create_user_with_workspace(
+                db, email=email, name=profile.get("name") or email, password=None
+            )
     user.google_sub = sub
     user.avatar_url = profile.get("picture") or user.avatar_url
 
     account = db.scalar(
-        select(OAuthAccount).where(OAuthAccount.user_id == user.id, OAuthAccount.provider == "google")
+        select(OAuthAccount).where(
+            OAuthAccount.user_id == user.id, OAuthAccount.provider == "google"
+        )
     ) or OAuthAccount(user_id=user.id, provider="google", subject=sub)
     account.access_token = tokens.get("access_token")
     account.refresh_token = tokens.get("refresh_token") or account.refresh_token
@@ -132,10 +143,14 @@ def _valid_access_token(db: Session, account: OAuthAccount) -> str:
     return account.access_token
 
 
-def import_calendar_events(db: Session, user: User, workspace_id: str, days_ahead: int = 14) -> list[Meeting]:
+def import_calendar_events(
+    db: Session, user: User, workspace_id: str, days_ahead: int = 14
+) -> list[Meeting]:
     """Create 'scheduled' meetings for upcoming events that have at least one other attendee."""
     account = db.scalar(
-        select(OAuthAccount).where(OAuthAccount.user_id == user.id, OAuthAccount.provider == "google")
+        select(OAuthAccount).where(
+            OAuthAccount.user_id == user.id, OAuthAccount.provider == "google"
+        )
     )
     if account is None:
         raise ValidationFailed("Connect Google Calendar first")

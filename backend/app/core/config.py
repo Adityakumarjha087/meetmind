@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LLMProviderName = Literal["offline", "anthropic", "openai", "gemini", "ollama"]
@@ -13,6 +13,7 @@ STTBackendName = Literal["sidecar", "faster_whisper", "openai_whisper"]
 DiarizerBackendName = Literal["spectral", "pyannote"]
 EmbeddingBackendName = Literal["hashing", "openai"]
 StorageBackendName = Literal["local", "s3"]
+DEV_JWT_SECRET = "dev-insecure-change-me-please-32-bytes-minimum"  # noqa: S105
 
 
 class Settings(BaseSettings):
@@ -29,7 +30,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:20700"])
 
     # --- security ---
-    jwt_secret: str = "dev-insecure-change-me-please-32-bytes-minimum"
+    jwt_secret: str = DEV_JWT_SECRET
     jwt_algorithm: str = "HS256"
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 14
@@ -98,7 +99,7 @@ class Settings(BaseSettings):
     google_client_secret: str | None = None
     google_redirect_uri: str = "http://localhost:20701/api/v1/auth/google/callback"
     google_auth_base: str = "https://accounts.google.com"
-    google_token_url: str = "https://oauth2.googleapis.com/token"
+    google_token_url: str = "https://oauth2.googleapis.com/token"  # noqa: S105
     google_userinfo_url: str = "https://openidconnect.googleapis.com/v1/userinfo"
     google_calendar_base: str = "https://www.googleapis.com/calendar/v3"
     slack_allowed_hosts: list[str] = Field(default_factory=lambda: ["hooks.slack.com"])
@@ -134,6 +135,14 @@ class Settings(BaseSettings):
         if isinstance(value, str) and not value.strip().startswith("["):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
+
+    @model_validator(mode="after")
+    def _production_guards(self) -> Settings:
+        if self.environment == "production" and self.jwt_secret == DEV_JWT_SECRET:
+            raise ValueError("JWT_SECRET must be set in production")
+        if len(self.jwt_secret) < 32:
+            raise ValueError("JWT_SECRET must be at least 32 characters")
+        return self
 
     @property
     def is_sqlite(self) -> bool:

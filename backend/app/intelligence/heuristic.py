@@ -7,6 +7,7 @@ and doubles as a regression baseline for the LLM engines.
 
 from __future__ import annotations
 
+import itertools
 import math
 import re
 from collections import Counter, defaultdict
@@ -42,15 +43,71 @@ from app.schemas.insights import (
 )
 
 POSITIVE = {
-    "great", "good", "excited", "exciting", "fantastic", "awesome", "excellent", "love", "happy",
-    "glad", "agree", "agreed", "perfect", "nice", "progress", "ready", "unblocks", "win", "success",
-    "successful", "thanks", "thank", "appreciate", "confident", "smooth", "track", "improved", "solid",
+    "great",
+    "good",
+    "excited",
+    "exciting",
+    "fantastic",
+    "awesome",
+    "excellent",
+    "love",
+    "happy",
+    "glad",
+    "agree",
+    "agreed",
+    "perfect",
+    "nice",
+    "progress",
+    "ready",
+    "unblocks",
+    "win",
+    "success",
+    "successful",
+    "thanks",
+    "thank",
+    "appreciate",
+    "confident",
+    "smooth",
+    "track",
+    "improved",
+    "solid",
 }
 NEGATIVE = {
-    "worried", "worry", "concern", "concerned", "bug", "bugs", "issue", "issues", "problem",
-    "problems", "risk", "risky", "blocked", "blocker", "delay", "delayed", "late", "frustrated",
-    "frustrating", "bad", "fail", "failed", "failing", "broken", "unhappy", "difficult", "churn",
-    "complaint", "complaints", "slow", "behind", "unclear", "confused", "crash", "crashes",
+    "worried",
+    "worry",
+    "concern",
+    "concerned",
+    "bug",
+    "bugs",
+    "issue",
+    "issues",
+    "problem",
+    "problems",
+    "risk",
+    "risky",
+    "blocked",
+    "blocker",
+    "delay",
+    "delayed",
+    "late",
+    "frustrated",
+    "frustrating",
+    "bad",
+    "fail",
+    "failed",
+    "failing",
+    "broken",
+    "unhappy",
+    "difficult",
+    "churn",
+    "complaint",
+    "complaints",
+    "slow",
+    "behind",
+    "unclear",
+    "confused",
+    "crash",
+    "crashes",
 }
 UNCERTAIN = re.compile(
     r"\b(not sure|don't know|do not know|no idea|unclear|tbd|to be determined|revisit|follow up on|"
@@ -78,7 +135,25 @@ _DECISION = re.compile(
 )
 _FILLER_PREFIX = re.compile(r"^(?:so|okay|ok|alright|well|and|also|great|good point)[,.]?\s+", re.I)
 _TRAILING = re.compile(r"[\s,;:.!?]+$")
-_NON_NAMES = {"I", "We", "You", "So", "And", "But", "Okay", "Ok", "Yes", "No", "Please", "Also", "Then", "Thanks", "Great", "Good", "Well"}
+_NON_NAMES = {
+    "I",
+    "We",
+    "You",
+    "So",
+    "And",
+    "But",
+    "Okay",
+    "Ok",
+    "Yes",
+    "No",
+    "Please",
+    "Also",
+    "Then",
+    "Thanks",
+    "Great",
+    "Good",
+    "Well",
+}
 
 
 def _cap(text: str) -> str:
@@ -119,14 +194,13 @@ class HeuristicEngine:
         for s in sents:
             owner: str | None = None
             what: str | None = None
-            if m := _REQUEST.search(s.text):
-                if m.group("name") not in _NON_NAMES:
-                    owner, what = m.group("name"), m.group("what")
+            if (m := _REQUEST.search(s.text)) and m.group("name") not in _NON_NAMES:
+                owner, what = m.group("name"), m.group("what")
             if what is None and (m := _ACTION_TAG.search(s.text)):
                 what = m.group("what")
-            if what is None and (m := _NAMED_WILL.search(s.text)):
-                if m.group("name") not in _NON_NAMES:
-                    owner, what = m.group("name"), m.group("what")
+            m = _NAMED_WILL.search(s.text) if what is None else None
+            if m and m.group("name") not in _NON_NAMES:
+                owner, what = m.group("name"), m.group("what")
             if what is None and (m := _COMMIT.search(s.text)):
                 if s.text.rstrip().endswith("?"):
                     continue
@@ -190,7 +264,14 @@ class HeuristicEngine:
             talk[ln.speaker] += max(0.0, ln.end - ln.start)
             wc[ln.speaker] += len(toks)
             for i, t in enumerate(toks):
-                negated = i > 0 and toks[i - 1] in {"not", "no", "never", "isn't", "don't", "aren't"}
+                negated = i > 0 and toks[i - 1] in {
+                    "not",
+                    "no",
+                    "never",
+                    "isn't",
+                    "don't",
+                    "aren't",
+                }
                 if t in POSITIVE:
                     (neg if negated else pos)[ln.speaker] += 1
                 elif t in NEGATIVE:
@@ -216,10 +297,12 @@ class HeuristicEngine:
         uni: Counter[str] = Counter()
         bi: Counter[str] = Counter()
         for s in sents:
-            toks = [t for t in words(s.text) if t not in STOPWORDS and len(t) > 2 and not t.isdigit()]
+            toks = [
+                t for t in words(s.text) if t not in STOPWORDS and len(t) > 2 and not t.isdigit()
+            ]
             uni.update(toks)
             raw = words(s.text)
-            for a, b in zip(raw, raw[1:], strict=False):
+            for a, b in itertools.pairwise(raw):
                 if a not in STOPWORDS and b not in STOPWORDS and len(a) > 2 and len(b) > 2:
                     bi[f"{a} {b}"] += 1
         topics = [p for p, c in bi.most_common(k) if c >= 2]
@@ -305,7 +388,9 @@ class HeuristicEngine:
                 + (f" to {', '.join(owners)}." if owners else ".")
             )
         if questions:
-            parts.append(f"{len(questions)} question{'s remain' if len(questions) != 1 else ' remains'} open.")
+            parts.append(
+                f"{len(questions)} question{'s remain' if len(questions) != 1 else ' remains'} open."
+            )
         return " ".join(parts)
 
     def reduce(self, data: AnalysisInput, partials: list[Insights]) -> AnalysisResult:
@@ -344,7 +429,9 @@ class HeuristicEngine:
                 terms = set(content_terms(sent))
                 overlap = len(q_terms & terms)
                 if overlap:
-                    scored.append((overlap / math.sqrt(len(terms) + 1) + 0.1 * ctx.score, ctx, sent))
+                    scored.append(
+                        (overlap / math.sqrt(len(terms) + 1) + 0.1 * ctx.score, ctx, sent)
+                    )
         if not scored:
             return AnswerResult(
                 "I couldn't find anything about that in your meetings.",
@@ -361,14 +448,16 @@ class HeuristicEngine:
             if len(picked) == 3:
                 break
         lines = [
-            f"- In \"{ctx.meeting_title}\" at {fmt_ts(ctx.start_s)}: {sent} [{ctx.index}]"
+            f'- In "{ctx.meeting_title}" at {fmt_ts(ctx.start_s)}: {sent} [{ctx.index}]'
             for ctx, sent in picked
         ]
         answer = "Here is what your meetings say:\n" + "\n".join(lines)
         cited = sorted({ctx.index for ctx, _ in picked})
         prompt_tokens = estimate_tokens(question + "".join(c.text for c in contexts))
         return AnswerResult(
-            answer, cited, [LLMUsage("offline", "heuristic", prompt_tokens, estimate_tokens(answer), 0.0, True)]
+            answer,
+            cited,
+            [LLMUsage("offline", "heuristic", prompt_tokens, estimate_tokens(answer), 0.0, True)],
         )
 
     @staticmethod

@@ -6,6 +6,7 @@ import time
 from typing import Any
 
 import anthropic
+from anthropic.types.beta import BetaMessageParam, BetaOutputConfigParam
 
 from app.llm.base import Completion, LLMError
 
@@ -13,7 +14,9 @@ from app.llm.base import Completion, LLMError
 class AnthropicChatModel:
     provider = "anthropic"
 
-    def __init__(self, client: anthropic.Anthropic, model: str = "claude-opus-5-5", effort: str = "medium") -> None:
+    def __init__(
+        self, client: anthropic.Anthropic, model: str = "claude-opus-5-5", effort: str = "medium"
+    ) -> None:
         self._client = client
         self.model = model
         self.effort = effort
@@ -26,17 +29,18 @@ class AnthropicChatModel:
         json_schema: dict[str, Any] | None = None,
         max_tokens: int = 16000,
     ) -> Completion:
-        output_config: dict[str, Any] = {"effort": self.effort}
+        output_config: BetaOutputConfigParam = {"effort": self.effort}  # type: ignore[typeddict-item]
         if json_schema is not None:
             output_config["format"] = {"type": "json_schema", "schema": json_schema}
+        messages: list[BetaMessageParam] = [{"role": "user", "content": prompt}]
         started = time.perf_counter()
         try:
             response = self._client.beta.messages.create(
                 model=self.model,
                 max_tokens=max_tokens,
                 system=system,
-                messages=[{"role": "user", "content": prompt}],
-                output_config=output_config,  # type: ignore[arg-type]
+                messages=messages,
+                output_config=output_config,
                 betas=["server-side-fallback-2026-07-01"],
                 fallbacks="default",
             )

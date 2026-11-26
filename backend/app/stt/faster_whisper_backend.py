@@ -10,7 +10,9 @@ from app.stt.base import TranscriptionContext, TranscriptPiece
 class FasterWhisperTranscriber:
     name = "faster_whisper"
 
-    def __init__(self, model_size: str = "base", device: str = "auto", compute_type: str = "int8") -> None:
+    def __init__(
+        self, model_size: str = "base", device: str = "auto", compute_type: str = "int8"
+    ) -> None:
         from faster_whisper import WhisperModel
 
         self._model: Any = WhisperModel(model_size, device=device, compute_type=compute_type)

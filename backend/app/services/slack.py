@@ -24,16 +24,23 @@ def validate_webhook_url(url: str) -> str:
     return url
 
 
-def build_blocks(meeting: Meeting, items: list[ActionItem], share_url: str | None) -> dict[str, Any]:
+def build_blocks(
+    meeting: Meeting, items: list[ActionItem], share_url: str | None
+) -> dict[str, Any]:
     insights = insights_of(meeting)
     summary = insights.executive_summary if insights else "Summary not available yet."
     blocks: list[dict[str, Any]] = [
-        {"type": "header", "text": {"type": "plain_text", "text": f"Meeting notes: {meeting.title}"[:150]}},
+        {
+            "type": "header",
+            "text": {"type": "plain_text", "text": f"Meeting notes: {meeting.title}"[:150]},
+        },
         {"type": "section", "text": {"type": "mrkdwn", "text": summary[:2900]}},
     ]
     if insights and insights.decisions:
         text = "\n".join(f"• {d.text}" for d in insights.decisions[:10])
-        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*Decisions*\n{text}"[:2900]}})
+        blocks.append(
+            {"type": "section", "text": {"type": "mrkdwn", "text": f"*Decisions*\n{text}"[:2900]}}
+        )
     if items:
         lines = []
         for it in items[:15]:
@@ -41,11 +48,17 @@ def build_blocks(meeting: Meeting, items: list[ActionItem], share_url: str | Non
             due = f" (due {it.due_date.isoformat()})" if it.due_date else ""
             lines.append(f"• {it.title}{owner}{due}")
         blocks.append(
-            {"type": "section", "text": {"type": "mrkdwn", "text": "*Action items*\n" + "\n".join(lines)}}
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": "*Action items*\n" + "\n".join(lines)},
+            }
         )
     if share_url:
         blocks.append(
-            {"type": "context", "elements": [{"type": "mrkdwn", "text": f"<{share_url}|Open in MeetMind>"}]}
+            {
+                "type": "context",
+                "elements": [{"type": "mrkdwn", "text": f"<{share_url}|Open in MeetMind>"}],
+            }
         )
     return {"text": f"Meeting notes: {meeting.title}", "blocks": blocks}
 
@@ -62,7 +75,11 @@ def post_meeting_summary(db: Session, meeting: Meeting) -> None:
         raise ValidationFailed("No Slack webhook configured for this workspace")
     url = validate_webhook_url(workspace.slack_webhook_url)
     items = list(
-        db.scalars(select(ActionItem).where(ActionItem.meeting_id == meeting.id).order_by(ActionItem.position))
+        db.scalars(
+            select(ActionItem)
+            .where(ActionItem.meeting_id == meeting.id)
+            .order_by(ActionItem.position)
+        )
     )
     payload = build_blocks(meeting, items, share_url_for(meeting))
     try:
@@ -71,4 +88,6 @@ def post_meeting_summary(db: Session, meeting: Meeting) -> None:
     except httpx2.HTTPError as exc:
         raise IntegrationError("Could not reach Slack") from exc
     if resp.status_code >= 400:
-        raise IntegrationError(f"Slack rejected the message ({resp.status_code}): {resp.text[:200]}")
+        raise IntegrationError(
+            f"Slack rejected the message ({resp.status_code}): {resp.text[:200]}"
+        )

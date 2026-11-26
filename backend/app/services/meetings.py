@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 from sqlalchemy import select, update
@@ -30,7 +31,7 @@ def rename_speaker(db: Session, meeting: Meeting, speaker_id: str, new_name: str
         .values(owner_name=new_name)
     )
     if meeting.insights:
-        data: dict[str, Any] = dict(meeting.insights)
+        data: dict[str, Any] = copy.deepcopy(meeting.insights)
         for item in data.get("action_items", []):
             if item.get("owner") == old:
                 item["owner"] = new_name
@@ -38,9 +39,11 @@ def rename_speaker(db: Session, meeting: Meeting, speaker_id: str, new_name: str
             if s.get("speaker") == old:
                 s["speaker"] = new_name
         meeting.insights = data
-    for chunk in db.scalars(select(TranscriptChunk).where(TranscriptChunk.meeting_id == meeting.id)):
+    for chunk in db.scalars(
+        select(TranscriptChunk).where(TranscriptChunk.meeting_id == meeting.id)
+    ):
         if old in (chunk.speakers or []):
-            chunk.speakers = sorted(new_name if s == old else s for s in chunk.speakers)
+            chunk.speakers = sorted(new_name if s == old else s for s in list(chunk.speakers))
             chunk.text = chunk.text.replace(f"{old}:", f"{new_name}:")
     db.flush()
     return speaker

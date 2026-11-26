@@ -69,7 +69,9 @@ class ServiceUnavailable(AppError):
     code = "service_unavailable"
 
 
-def error_body(code: str, message: str, request: Request, details: Any | None = None) -> dict[str, Any]:
+def error_body(
+    code: str, message: str, request: Request, details: Any | None = None
+) -> dict[str, Any]:
     body: dict[str, Any] = {"error": {"code": code, "message": message}}
     if details is not None:
         body["error"]["details"] = details
@@ -92,7 +94,11 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(RequestValidationError)
     async def _validation(request: Request, exc: RequestValidationError) -> JSONResponse:
         details = [
-            {"loc": list(err.get("loc", [])), "msg": err.get("msg", ""), "type": err.get("type", "")}
+            {
+                "loc": list(err.get("loc", [])),
+                "msg": err.get("msg", ""),
+                "type": err.get("type", ""),
+            }
             for err in exc.errors()
         ]
         return JSONResponse(

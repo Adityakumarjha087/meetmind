@@ -133,7 +133,9 @@ class S3Storage:
         return data
 
     def get_range(self, key: str, start: int, end: int) -> bytes:
-        obj = self.client.get_object(Bucket=self.bucket, Key=_safe_key(key), Range=f"bytes={start}-{end}")
+        obj = self.client.get_object(
+            Bucket=self.bucket, Key=_safe_key(key), Range=f"bytes={start}-{end}"
+        )
         data: bytes = obj["Body"].read()
         return data
 

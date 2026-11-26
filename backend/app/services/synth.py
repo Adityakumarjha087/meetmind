@@ -24,7 +24,9 @@ HARMONIC_PROFILES = [
 ]
 
 
-def synthesize(segments: list[dict[str, Any]], path: Path, sample_rate: int = 16000, seed: int = 0) -> float:
+def synthesize(
+    segments: list[dict[str, Any]], path: Path, sample_rate: int = 16000, seed: int = 0
+) -> float:
     rng = np.random.default_rng(seed)
     speakers: dict[str, int] = {}
     for seg in segments:

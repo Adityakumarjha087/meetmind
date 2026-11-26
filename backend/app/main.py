@@ -10,7 +10,16 @@ import socketio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import action_items, ask, auth, health, integrations, meetings, public, workspaces
+from app.api.routes import (
+    action_items,
+    ask,
+    auth,
+    health,
+    integrations,
+    meetings,
+    public,
+    workspaces,
+)
 from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
@@ -37,7 +46,12 @@ def create_app(sio: socketio.AsyncServer | None = None) -> FastAPI:
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         if sio is not None and not settings.redis_url:
             set_emitter(LoopEmitter(sio, asyncio.get_running_loop()))
-        log.info("startup", environment=settings.environment, llm=settings.llm_provider, stt=settings.stt_backend)
+        log.info(
+            "startup",
+            environment=settings.environment,
+            llm=settings.llm_provider,
+            stt=settings.stt_backend,
+        )
         yield
         set_emitter(None)
 
@@ -53,7 +67,9 @@ def create_app(sio: socketio.AsyncServer | None = None) -> FastAPI:
     register_exception_handlers(app)
 
     if settings.rate_limit_enabled:
-        store = RedisCounterStore(settings.redis_url) if settings.redis_url else MemoryCounterStore()
+        store = (
+            RedisCounterStore(settings.redis_url) if settings.redis_url else MemoryCounterStore()
+        )
         p = settings.api_prefix
         app.add_middleware(
             RateLimitMiddleware,
@@ -62,7 +78,9 @@ def create_app(sio: socketio.AsyncServer | None = None) -> FastAPI:
                 RateRule(f"{p}/auth/login", settings.rate_limit_auth_per_minute),
                 RateRule(f"{p}/auth/register", settings.rate_limit_auth_per_minute),
                 RateRule(f"{p}/auth/refresh", settings.rate_limit_auth_per_minute * 3),
-                RateRule(f"{p}/workspaces/", settings.rate_limit_upload_per_minute, frozenset({"POST"})),
+                RateRule(
+                    f"{p}/workspaces/", settings.rate_limit_upload_per_minute, frozenset({"POST"})
+                ),
             ],
             default_limit=settings.rate_limit_default_per_minute,
         )

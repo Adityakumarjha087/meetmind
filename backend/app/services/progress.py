@@ -48,7 +48,9 @@ class LoopEmitter:
     def emit(self, event: str, data: dict[str, Any], rooms: list[str]) -> None:
         for room in rooms:
             if self._loop.is_running():
-                asyncio.run_coroutine_threadsafe(self._server.emit(event, data, room=room), self._loop)
+                asyncio.run_coroutine_threadsafe(
+                    self._server.emit(event, data, room=room), self._loop
+                )
 
 
 _override: Emitter | None = None

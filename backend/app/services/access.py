@@ -11,7 +11,9 @@ from app.models import ActionItem, Meeting, Membership, Role, User
 
 def membership_for(db: Session, user: User, workspace_id: str) -> Membership:
     membership = db.scalar(
-        select(Membership).where(Membership.workspace_id == workspace_id, Membership.user_id == user.id)
+        select(Membership).where(
+            Membership.workspace_id == workspace_id, Membership.user_id == user.id
+        )
     )
     if membership is None:
         # 404 rather than 403: do not reveal that the workspace exists.
@@ -37,7 +39,9 @@ def meeting_for(db: Session, user: User, meeting_id: str, minimum: Role = Role.V
     return meeting
 
 
-def action_item_for(db: Session, user: User, item_id: str, minimum: Role = Role.MEMBER) -> ActionItem:
+def action_item_for(
+    db: Session, user: User, item_id: str, minimum: Role = Role.MEMBER
+) -> ActionItem:
     item = db.get(ActionItem, item_id)
     if item is None:
         raise NotFoundError("Action item not found")

@@ -20,7 +20,11 @@ def to_markdown(meeting: Meeting, items: list[ActionItem], include_transcript: b
             out += ["## Key points", "", *[f"- {p}" for p in insights.key_points], ""]
         if insights.decisions:
             out += ["## Decisions", ""]
-            out += [f"- {d.text}" + (f" _({fmt_ts(d.timestamp_s)})_" if d.timestamp_s is not None else "") for d in insights.decisions]
+            out += [
+                f"- {d.text}"
+                + (f" _({fmt_ts(d.timestamp_s)})_" if d.timestamp_s is not None else "")
+                for d in insights.decisions
+            ]
             out.append("")
     if items:
         out += ["## Action items", "", "| Status | Task | Owner | Due |", "|---|---|---|---|"]
@@ -46,7 +50,16 @@ def to_markdown(meeting: Meeting, items: list[ActionItem], include_transcript: b
 
 
 def _latin1(text: str) -> str:
-    replacements = {"—": "-", "–": "-", "‘": "'", "’": "'", "“": '"', "”": '"', "•": "-", "…": "..."}
+    replacements = {
+        "—": "-",
+        "–": "-",
+        "‘": "'",
+        "’": "'",
+        "“": '"',
+        "”": '"',
+        "•": "-",
+        "…": "...",
+    }
     for k, v in replacements.items():
         text = text.replace(k, v)
     return text.encode("latin-1", "replace").decode("latin-1")
@@ -70,7 +83,13 @@ def to_pdf(meeting: Meeting, items: list[ActionItem]) -> bytes:
     pdf.set_font("Helvetica", size=9)
     pdf.set_text_color(110)
     when = (meeting.scheduled_at or meeting.created_at).strftime("%Y-%m-%d %H:%M UTC")
-    pdf.cell(0, 6, _latin1(f"{when}  |  duration {fmt_ts(meeting.duration_s or 0)}"), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(
+        0,
+        6,
+        _latin1(f"{when}  |  duration {fmt_ts(meeting.duration_s or 0)}"),
+        new_x=XPos.LMARGIN,
+        new_y=YPos.NEXT,
+    )
     pdf.set_text_color(0)
 
     def heading(text: str) -> None:
@@ -84,7 +103,9 @@ def to_pdf(meeting: Meeting, items: list[ActionItem]) -> bytes:
 
     if insights:
         heading("Executive summary")
-        pdf.multi_cell(0, 5.5, _latin1(insights.executive_summary), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.multi_cell(
+            0, 5.5, _latin1(insights.executive_summary), new_x=XPos.LMARGIN, new_y=YPos.NEXT
+        )
         if insights.decisions:
             heading("Decisions")
             for d in insights.decisions:
@@ -92,7 +113,15 @@ def to_pdf(meeting: Meeting, items: list[ActionItem]) -> bytes:
     if items:
         heading("Action items")
         for it in items:
-            meta = ", ".join(x for x in [it.owner_name or "", f"due {it.due_date.isoformat()}" if it.due_date else "", it.status.value.replace("_", " ")] if x)
+            meta = ", ".join(
+                x
+                for x in [
+                    it.owner_name or "",
+                    f"due {it.due_date.isoformat()}" if it.due_date else "",
+                    it.status.value.replace("_", " "),
+                ]
+                if x
+            )
             bullet(f"{it.title} ({meta})")
     if insights and insights.open_questions:
         heading("Open questions")
@@ -103,5 +132,11 @@ def to_pdf(meeting: Meeting, items: list[ActionItem]) -> bytes:
         pdf.set_font("Helvetica", size=9)
         for seg in meeting.segments:
             name = seg.speaker.display_name if seg.speaker else "Unknown"
-            pdf.multi_cell(0, 5, _latin1(f"[{fmt_ts(seg.start_s)}] {name}: {seg.text}"), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.multi_cell(
+                0,
+                5,
+                _latin1(f"[{fmt_ts(seg.start_s)}] {name}: {seg.text}"),
+                new_x=XPos.LMARGIN,
+                new_y=YPos.NEXT,
+            )
     return bytes(pdf.output())

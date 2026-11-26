@@ -20,7 +20,11 @@ log = get_logger(__name__)
 
 def user_out(db: DB, user: User) -> UserOut:
     connected = (
-        db.scalar(select(OAuthAccount.id).where(OAuthAccount.user_id == user.id, OAuthAccount.provider == "google"))
+        db.scalar(
+            select(OAuthAccount.id).where(
+                OAuthAccount.user_id == user.id, OAuthAccount.provider == "google"
+            )
+        )
         is not None
     )
     return UserOut(
@@ -58,7 +62,9 @@ def _token_response(db: DB, response: Response, user: User, access: str, refresh
 
 @router.post("/register", response_model=TokenOut, status_code=201)
 def register(body: RegisterIn, request: Request, response: Response, db: DB) -> TokenOut:
-    user = accounts.create_user_with_workspace(db, email=body.email, name=body.name, password=body.password)
+    user = accounts.create_user_with_workspace(
+        db, email=body.email, name=body.name, password=body.password
+    )
     access, refresh = accounts.issue_tokens(db, user, request.headers.get("user-agent"))
     db.commit()
     log.info("user_registered", user_id=user.id)
@@ -74,24 +80,34 @@ def login(body: LoginIn, request: Request, response: Response, db: DB) -> TokenO
 
 
 @router.post("/refresh", response_model=TokenOut)
-def refresh(request: Request, response: Response, db: DB, body: RefreshIn | None = None) -> TokenOut:
+def refresh(
+    request: Request, response: Response, db: DB, body: RefreshIn | None = None
+) -> TokenOut:
     """Rotate the refresh token. Accepts the httpOnly cookie (browser) or a JSON body (API clients)."""
-    token = (body.refresh_token if body else None) or request.cookies.get(get_settings().refresh_cookie_name)
+    token = (body.refresh_token if body else None) or request.cookies.get(
+        get_settings().refresh_cookie_name
+    )
     if not token:
         raise AuthError("Missing refresh token")
-    user, access, new_refresh = accounts.rotate_refresh_token(db, token, request.headers.get("user-agent"))
+    user, access, new_refresh = accounts.rotate_refresh_token(
+        db, token, request.headers.get("user-agent")
+    )
     db.commit()
     return _token_response(db, response, user, access, new_refresh)
 
 
 @router.post("/logout", status_code=204)
 def logout(request: Request, response: Response, db: DB, body: RefreshIn | None = None) -> Response:
-    token = (body.refresh_token if body else None) or request.cookies.get(get_settings().refresh_cookie_name)
+    token = (body.refresh_token if body else None) or request.cookies.get(
+        get_settings().refresh_cookie_name
+    )
     if token:
         accounts.revoke_refresh_token(db, token)
         db.commit()
     response = Response(status_code=204)
-    response.delete_cookie(get_settings().refresh_cookie_name, path=f"{get_settings().api_prefix}/auth")
+    response.delete_cookie(
+        get_settings().refresh_cookie_name, path=f"{get_settings().api_prefix}/auth"
+    )
     return response
 
 
@@ -113,7 +129,9 @@ def google_link(user: CurrentUser) -> GoogleAuthUrlOut:
 
 
 @router.get("/google/callback", include_in_schema=False)
-def google_callback(request: Request, db: DB, code: str = "", state: str = "", error: str = "") -> RedirectResponse:
+def google_callback(
+    request: Request, db: DB, code: str = "", state: str = "", error: str = ""
+) -> RedirectResponse:
     settings = get_settings()
     target = f"{settings.frontend_url.rstrip('/')}/auth/callback"
     if error or not code or not state:

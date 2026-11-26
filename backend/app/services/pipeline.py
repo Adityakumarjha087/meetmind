@@ -125,7 +125,9 @@ def _emit(deps: PipelineDeps, meeting: Meeting) -> None:
     )
 
 
-def _set_stage(deps: PipelineDeps, meeting_id: str, stage: PipelineStage, message: str | None = None) -> None:
+def _set_stage(
+    deps: PipelineDeps, meeting_id: str, stage: PipelineStage, message: str | None = None
+) -> None:
     with deps.session_factory() as db:
         meeting = db.get(Meeting, meeting_id)
         if meeting is None:
@@ -139,7 +141,9 @@ def _set_stage(deps: PipelineDeps, meeting_id: str, stage: PipelineStage, messag
         _emit(deps, meeting)
 
 
-def build_chunks(lines: list[TranscriptLine], target_words: int = 120) -> list[list[TranscriptLine]]:
+def build_chunks(
+    lines: list[TranscriptLine], target_words: int = 120
+) -> list[list[TranscriptLine]]:
     """Group consecutive lines into ~target_words windows with a one-line overlap."""
     chunks: list[list[TranscriptLine]] = []
     current: list[TranscriptLine] = []
@@ -157,7 +161,11 @@ def build_chunks(lines: list[TranscriptLine], target_words: int = 120) -> list[l
 
 
 def record_llm_usage(
-    db: Session, settings: Settings, workspace_id: str, meeting_id: str | None, usage: list[LLMUsage]
+    db: Session,
+    settings: Settings,
+    workspace_id: str,
+    meeting_id: str | None,
+    usage: list[LLMUsage],
 ) -> None:
     for u in usage:
         db.add(
@@ -170,8 +178,12 @@ def record_llm_usage(
                 input_tokens=u.input_tokens,
                 output_tokens=u.output_tokens,
                 duration_ms=u.latency_ms,
-                cost_usd=costs.llm_cost(settings, u.provider, u.model, u.input_tokens, u.output_tokens),
-                projected_cost_usd=costs.llm_projected_cost(settings, u.input_tokens, u.output_tokens),
+                cost_usd=costs.llm_cost(
+                    settings, u.provider, u.model, u.input_tokens, u.output_tokens
+                ),
+                projected_cost_usd=costs.llm_projected_cost(
+                    settings, u.input_tokens, u.output_tokens
+                ),
             )
         )
 
@@ -234,12 +246,21 @@ def run_pipeline(meeting_id: str, deps: PipelineDeps | None = None) -> None:
                 m.duration_s = round(audio.duration_s, 3)
                 m.waveform_peaks = peaks
                 m.audio_sha256 = sha
-            log.info("pipeline_normalized", meeting_id=meeting_id, method=method, duration_s=audio.duration_s)
+            log.info(
+                "pipeline_normalized",
+                meeting_id=meeting_id,
+                method=method,
+                duration_s=audio.duration_s,
+            )
 
             # 2. transcribe ------------------------------------------------------------
             _set_stage(deps, meeting_id, PipelineStage.TRANSCRIBE)
             t0 = time.perf_counter()
-            sidecar_text = deps.storage.get_bytes(sidecar_key).decode("utf-8", "replace") if sidecar_key else None
+            sidecar_text = (
+                deps.storage.get_bytes(sidecar_key).decode("utf-8", "replace")
+                if sidecar_key
+                else None
+            )
             ctx = TranscriptionContext(
                 audio_path=normalized,
                 audio=audio,

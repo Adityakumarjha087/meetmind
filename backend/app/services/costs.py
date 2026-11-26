@@ -14,7 +14,9 @@ def stt_projected_cost(settings: Settings, audio_seconds: float) -> float:
     return round(settings.reference_stt_per_minute * audio_seconds / 60.0, 6)
 
 
-def llm_cost(settings: Settings, provider: str, model: str, input_tokens: int, output_tokens: int) -> float:
+def llm_cost(
+    settings: Settings, provider: str, model: str, input_tokens: int, output_tokens: int
+) -> float:
     if provider in {"offline", "ollama"}:
         return 0.0
     inp, out = settings.llm_prices_per_mtok.get(model, (0.0, 0.0))

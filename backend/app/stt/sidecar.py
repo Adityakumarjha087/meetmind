@@ -100,7 +100,9 @@ def parse_plain(raw: str, ctx: TranscriptionContext) -> list[TranscriptPiece]:
     return out
 
 
-def parse_transcript(raw: str, filename: str | None, ctx: TranscriptionContext) -> list[TranscriptPiece]:
+def parse_transcript(
+    raw: str, filename: str | None, ctx: TranscriptionContext
+) -> list[TranscriptPiece]:
     name = (filename or "").lower()
     stripped = raw.lstrip()
     if name.endswith(".json") or stripped.startswith(("{", "[")):

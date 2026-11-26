@@ -31,7 +31,9 @@ def frame_energy_db(frames: FloatArray) -> FloatArray:
 
 
 @lru_cache(maxsize=8)
-def mel_filterbank(sample_rate: int, n_fft: int, n_mels: int, fmin: float, fmax: float) -> npt.NDArray[np.float64]:
+def mel_filterbank(
+    sample_rate: int, n_fft: int, n_mels: int, fmin: float, fmax: float
+) -> npt.NDArray[np.float64]:
     def hz_to_mel(f: npt.ArrayLike) -> npt.NDArray[np.float64]:
         return 2595.0 * np.log10(1.0 + np.asarray(f, dtype=np.float64) / 700.0)
 
@@ -60,7 +62,9 @@ def log_mel(frames: FloatArray, sample_rate: int, n_mels: int = 24) -> FloatArra
     return out
 
 
-def frame_pitch(frames: FloatArray, sample_rate: int, fmin: float = 70.0, fmax: float = 400.0) -> FloatArray:
+def frame_pitch(
+    frames: FloatArray, sample_rate: int, fmin: float = 70.0, fmax: float = 400.0
+) -> FloatArray:
     """Autocorrelation F0 per frame (0 where unvoiced). Vectorised via FFT."""
     n = frames.shape[1]
     x = frames - frames.mean(axis=1, keepdims=True)

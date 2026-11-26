@@ -39,7 +39,9 @@ def semantic_search(
         base = base.where(TranscriptChunk.meeting_id == meeting_id)
     if db.get_bind().dialect.name == "postgresql":
         distance = TranscriptChunk.embedding.cosine_distance(qvec)
-        rows = db.execute(base.add_columns(distance.label("d")).order_by(distance).limit(top_k)).all()
+        rows = db.execute(
+            base.add_columns(distance.label("d")).order_by(distance).limit(top_k)
+        ).all()
         hits = [SearchHit(r[0], r[1], round(1.0 - float(r[2]), 4)) for r in rows]
     else:
         rows = db.execute(base).all()
@@ -62,7 +64,9 @@ def answer_question(
     question: str,
     meeting_id: str | None = None,
 ) -> tuple[AnswerResult, list[ContextChunk]]:
-    hits = semantic_search(db, embedder, workspace_id, question, get_settings().rag_top_k, meeting_id)
+    hits = semantic_search(
+        db, embedder, workspace_id, question, get_settings().rag_top_k, meeting_id
+    )
     contexts = [
         ContextChunk(
             index=i + 1,

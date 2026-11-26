@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import re
 import tempfile
 from datetime import timedelta
@@ -46,8 +47,24 @@ from app.services.storage import StorageError, get_storage
 router = APIRouter(tags=["meetings"])
 
 AUDIO_EXTENSIONS = {
-    ".wav", ".mp3", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".webm", ".flac", ".mp4",
-    ".mov", ".mkv", ".mpeg", ".mpga", ".avi", ".wma", ".aiff", ".aif",
+    ".wav",
+    ".mp3",
+    ".m4a",
+    ".aac",
+    ".ogg",
+    ".oga",
+    ".opus",
+    ".webm",
+    ".flac",
+    ".mp4",
+    ".mov",
+    ".mkv",
+    ".mpeg",
+    ".mpga",
+    ".avi",
+    ".wma",
+    ".aiff",
+    ".aif",
 }
 TRANSCRIPT_EXTENSIONS = {".json", ".srt", ".vtt", ".txt"}
 MAX_TRANSCRIPT_BYTES = 5 * 1024 * 1024
@@ -58,11 +75,17 @@ def _counts(db: DB, ids: list[str]) -> tuple[dict[str, int], dict[str, int]]:
         return {}, {}
     ai = dict(
         db.execute(
-            select(ActionItem.meeting_id, func.count()).where(ActionItem.meeting_id.in_(ids)).group_by(ActionItem.meeting_id)
+            select(ActionItem.meeting_id, func.count())
+            .where(ActionItem.meeting_id.in_(ids))
+            .group_by(ActionItem.meeting_id)
         ).all()
     )
     sp = dict(
-        db.execute(select(Speaker.meeting_id, func.count()).where(Speaker.meeting_id.in_(ids)).group_by(Speaker.meeting_id)).all()
+        db.execute(
+            select(Speaker.meeting_id, func.count())
+            .where(Speaker.meeting_id.in_(ids))
+            .group_by(Speaker.meeting_id)
+        ).all()
     )
     return {str(k): int(v) for k, v in ai.items()}, {str(k): int(v) for k, v in sp.items()}
 
@@ -77,7 +100,9 @@ def media_url(meeting: Meeting) -> str | None:
     if not meeting.normalized_key:
         return None
     settings = get_settings()
-    token, _, _ = create_token(meeting.id, "media", timedelta(minutes=settings.media_token_ttl_minutes))
+    token, _, _ = create_token(
+        meeting.id, "media", timedelta(minutes=settings.media_token_ttl_minutes)
+    )
     return f"{settings.public_api_url.rstrip('/')}{settings.api_prefix}/meetings/{meeting.id}/audio?token={token}"
 
 
@@ -116,7 +141,9 @@ def _validate_audio(upload: UploadFile) -> str:
     suffix = Path(upload.filename or "").suffix.lower()
     ctype = (upload.content_type or "").lower()
     if suffix not in AUDIO_EXTENSIONS:
-        raise ValidationFailed(f"Unsupported file type '{suffix or 'unknown'}'. Upload audio or video.")
+        raise ValidationFailed(
+            f"Unsupported file type '{suffix or 'unknown'}'. Upload audio or video."
+        )
     if ctype and not ctype.startswith(("audio/", "video/", "application/octet-stream")):
         raise ValidationFailed(f"Unsupported content type '{ctype}'")
     return suffix
@@ -173,10 +200,19 @@ def list_meetings(
         stmt = stmt.where(Meeting.status == status)
     if q:
         like = f"%{q.lower()}%"
-        stmt = stmt.where(or_(func.lower(Meeting.title).like(like), func.lower(Meeting.original_filename).like(like)))
+        stmt = stmt.where(
+            or_(
+                func.lower(Meeting.title).like(like),
+                func.lower(Meeting.original_filename).like(like),
+            )
+        )
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = list(
-        db.scalars(stmt.order_by(func.coalesce(Meeting.scheduled_at, Meeting.created_at).desc()).limit(limit).offset(offset))
+        db.scalars(
+            stmt.order_by(func.coalesce(Meeting.scheduled_at, Meeting.created_at).desc())
+            .limit(limit)
+            .offset(offset)
+        )
     )
     ai, sp = _counts(db, [m.id for m in rows])
     return MeetingPage(
@@ -187,7 +223,9 @@ def list_meetings(
     )
 
 
-@router.post("/workspaces/{workspace_id}/meetings", response_model=MeetingDetailOut, status_code=201)
+@router.post(
+    "/workspaces/{workspace_id}/meetings", response_model=MeetingDetailOut, status_code=201
+)
 async def upload_meeting(
     workspace_id: str,
     user: CurrentUser,
@@ -196,10 +234,14 @@ async def upload_meeting(
     file: Annotated[UploadFile, File(description="Audio or video file")],
     title: Annotated[str | None, Form(max_length=300)] = None,
     source: Annotated[Literal["upload", "recording"], Form()] = "upload",
-    transcript: Annotated[UploadFile | None, File(description="Optional sidecar transcript")] = None,
+    transcript: Annotated[
+        UploadFile | None, File(description="Optional sidecar transcript")
+    ] = None,
 ) -> MeetingDetailOut:
     require_role(db, user, workspace_id, Role.MEMBER)
-    default_title = Path(file.filename or "Recording").stem.replace("_", " ").replace("-", " ").strip()
+    default_title = (
+        Path(file.filename or "Recording").stem.replace("_", " ").replace("-", " ").strip()
+    )
     meeting = Meeting(
         workspace_id=workspace_id,
         created_by_id=user.id,
@@ -221,7 +263,9 @@ def get_meeting(meeting_id: str, user: CurrentUser, db: DB) -> MeetingDetailOut:
 
 
 @router.patch("/meetings/{meeting_id}", response_model=MeetingDetailOut)
-def update_meeting(meeting_id: str, body: MeetingUpdate, user: CurrentUser, db: DB) -> MeetingDetailOut:
+def update_meeting(
+    meeting_id: str, body: MeetingUpdate, user: CurrentUser, db: DB
+) -> MeetingDetailOut:
     meeting = meeting_for(db, user, meeting_id, Role.MEMBER)
     if body.title is not None:
         meeting.title = body.title.strip()
@@ -235,10 +279,8 @@ def delete_meeting(meeting_id: str, user: CurrentUser, db: DB) -> Response:
     prefix = f"{meeting.workspace_id}/{meeting.id}"
     db.delete(meeting)
     db.commit()
-    try:
+    with contextlib.suppress(StorageError):
         get_storage().delete_prefix(prefix)
-    except StorageError:
-        pass
     return Response(status_code=204)
 
 
@@ -262,7 +304,9 @@ async def attach_audio(
 
 
 @router.post("/meetings/{meeting_id}/reprocess", response_model=ProgressOut, status_code=202)
-def reprocess(meeting_id: str, user: CurrentUser, db: DB, background: BackgroundTasks) -> ProgressOut:
+def reprocess(
+    meeting_id: str, user: CurrentUser, db: DB, background: BackgroundTasks
+) -> ProgressOut:
     meeting = meeting_for(db, user, meeting_id, Role.MEMBER)
     if not meeting.audio_key:
         raise ValidationFailed("Meeting has no audio")
@@ -291,15 +335,23 @@ def transcript(meeting_id: str, user: CurrentUser, db: DB) -> list[SegmentOut]:
     ).all()
     return [
         SegmentOut(
-            id=s.id, idx=s.idx, start_s=s.start_s, end_s=s.end_s, text=s.text,
-            speaker_id=s.speaker_id, speaker_name=name, confidence=s.confidence,
+            id=s.id,
+            idx=s.idx,
+            start_s=s.start_s,
+            end_s=s.end_s,
+            text=s.text,
+            speaker_id=s.speaker_id,
+            speaker_name=name,
+            confidence=s.confidence,
         )
         for s, name in rows
     ]
 
 
 @router.patch("/meetings/{meeting_id}/speakers/{speaker_id}", response_model=SpeakerOut)
-def update_speaker(meeting_id: str, speaker_id: str, body: SpeakerUpdate, user: CurrentUser, db: DB) -> SpeakerOut:
+def update_speaker(
+    meeting_id: str, speaker_id: str, body: SpeakerUpdate, user: CurrentUser, db: DB
+) -> SpeakerOut:
     meeting = meeting_for(db, user, meeting_id, Role.MEMBER)
     speaker = rename_speaker(db, meeting, speaker_id, body.display_name)
     db.commit()
@@ -333,11 +385,19 @@ def audio(meeting_id: str, request: Request, db: DB, token: str) -> Response:
         data = storage.get_range(meeting.normalized_key, start, end)
         headers["Content-Range"] = f"bytes {start}-{end}/{size}"
         return Response(data, status_code=206, media_type="audio/wav", headers=headers)
-    return Response(storage.get_bytes(meeting.normalized_key), media_type="audio/wav", headers=headers)
+    return Response(
+        storage.get_bytes(meeting.normalized_key), media_type="audio/wav", headers=headers
+    )
 
 
 def _items(db: DB, meeting_id: str) -> list[ActionItem]:
-    return list(db.scalars(select(ActionItem).where(ActionItem.meeting_id == meeting_id).order_by(ActionItem.position)))
+    return list(
+        db.scalars(
+            select(ActionItem)
+            .where(ActionItem.meeting_id == meeting_id)
+            .order_by(ActionItem.position)
+        )
+    )
 
 
 @router.get("/meetings/{meeting_id}/export")
@@ -345,7 +405,7 @@ def export_meeting(
     meeting_id: str,
     user: CurrentUser,
     db: DB,
-    format: Literal["md", "pdf"] = "md",  # noqa: A002
+    format: Literal["md", "pdf"] = "md",
     transcript: bool = True,
 ) -> Response:
     meeting = meeting_for(db, user, meeting_id)
