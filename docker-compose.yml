@@ -1,0 +1,121 @@
+name: meetmind
+
+x-backend-env: &backend-env
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+  LOG_JSON: "true"
+  DATABASE_URL: postgresql+psycopg://meetmind:${POSTGRES_PASSWORD:-meetmind}@postgres:5432/meetmind
+  REDIS_URL: redis://redis:6379/0
+  STORAGE_BACKEND: s3
+  S3_ENDPOINT_URL: http://minio:9000
+  S3_BUCKET: meetmind-audio
+  S3_ACCESS_KEY: ${MINIO_ROOT_USER:-meetmind}
+  S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-meetmind-minio-secret}
+  JWT_SECRET: ${JWT_SECRET:-dev-only-jwt-secret-change-me-0123456789abcdef}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:20700}
+  FRONTEND_URL: ${FRONTEND_URL:-http://localhost:20700}
+  PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:20701}
+  LLM_PROVIDER: ${LLM_PROVIDER:-offline}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+  STT_BACKEND: ${STT_BACKEND:-sidecar}
+  DIARIZER_BACKEND: ${DIARIZER_BACKEND:-spectral}
+  HF_TOKEN: ${HF_TOKEN:-}
+  EMBEDDING_BACKEND: ${EMBEDDING_BACKEND:-hashing}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:20701/api/v1/auth/google/callback}
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: meetmind
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-meetmind}
+      POSTGRES_DB: meetmind
+    ports: ["20710:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meetmind -d meetmind"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["20711:6379"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-meetmind}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-meetmind-minio-secret}
+    ports: ["20712:9000", "20713:9001"]
+    volumes: [miniodata:/data]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+      args:
+        INSTALL_ML: ${INSTALL_ML:-false}
+    command: ["api"]
+    environment:
+      <<: *backend-env
+      SEED_DEMO: ${SEED_DEMO:-true}
+    ports: ["20701:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      args:
+        INSTALL_ML: ${INSTALL_ML:-false}
+    command: ["worker"]
+    environment: *backend-env
+    depends_on:
+      backend: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.worker inspect ping -d celery@$$HOSTNAME --timeout 5 | grep -q pong"]
+      interval: 15s
+      timeout: 10s
+      start_period: 20s
+      retries: 5
+    restart: unless-stopped
+    # GPU (optional, for faster-whisper/pyannote): uncomment with the NVIDIA container toolkit.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{ driver: nvidia, count: 1, capabilities: [gpu] }]
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:20701}
+    ports: ["20700:3000"]
+    depends_on:
+      backend: { condition: service_healthy }
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
