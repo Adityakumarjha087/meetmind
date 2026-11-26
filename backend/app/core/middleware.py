@@ -15,6 +15,15 @@ from app.core.logging import get_logger
 
 log = get_logger("meetmind.access")
 
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Cross-Origin-Resource-Policy": "same-site",
+    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+}
+
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
     async def dispatch(
@@ -28,6 +37,10 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         duration_ms = round((time.perf_counter() - start) * 1000, 2)
         response.headers["X-Request-ID"] = request_id
+        for name, value in SECURITY_HEADERS.items():
+            response.headers.setdefault(name, value)
+        if request.url.path.startswith(("/docs", "/redoc")):
+            del response.headers["Content-Security-Policy"]  # Swagger UI loads its own assets
         if not request.url.path.startswith("/health"):
             log.info(
                 "request",

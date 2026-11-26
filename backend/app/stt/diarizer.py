@@ -18,7 +18,7 @@ from app.stt.features import frame_energy_db, frame_pitch, frame_signal, log_mel
 from app.stt.vad import SpeechRegion, detect_speech
 
 Matrix = npt.NDArray[np.float64]
-PITCH_WEIGHT = 8.0  # calibrated on ml/data (see docs/DECISIONS.md)
+PITCH_SCALE = 80.0  # per unit of log-F0 (~3.5 semitones -> 16 units); calibrated, see docs/DECISIONS.md
 
 
 @dataclass(frozen=True)
@@ -63,10 +63,11 @@ def _standardize(feats: Matrix) -> Matrix:
         out[:, -1] = 0.0
     else:
         out[np.isnan(pitch), -1] = np.nanmedian(pitch)
-    mu = out.mean(axis=0)
-    sd = out.std(axis=0) + 1e-6
-    out = (out - mu) / sd
-    out[:, -1] *= PITCH_WEIGHT  # pitch is the most speaker-discriminative cue in this feature set
+    # Spectral features are z-scored (relative), but pitch is kept on an absolute log scale so
+    # that the distance between two voices does not shrink as more speakers join the meeting.
+    spec = out[:, :-1]
+    out[:, :-1] = (spec - spec.mean(axis=0)) / (spec.std(axis=0) + 1e-6)
+    out[:, -1] = (out[:, -1] - np.median(out[:, -1])) * PITCH_SCALE
     return out
 
 
@@ -147,7 +148,7 @@ def to_turns(
 class SpectralDiarizer:
     name = "spectral"
 
-    def __init__(self, threshold: float = 1.7, max_speakers: int = 6) -> None:
+    def __init__(self, threshold: float = 2.2, max_speakers: int = 6) -> None:
         self.threshold = threshold
         self.max_speakers = max_speakers
 

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi import APIRouter
 from sqlalchemy import select
 
 from app.api.deps import DB
-from app.core.errors import NotFoundError
+from app.core.errors import GoneError, NotFoundError
 from app.models import ActionItem, Meeting
 from app.schemas.api import PublicMeetingOut
 from app.services.pipeline import insights_of
@@ -20,6 +22,11 @@ def shared_meeting(token: str, db: DB) -> PublicMeetingOut:
     meeting = db.scalar(select(Meeting).where(Meeting.share_token == token))
     if meeting is None:
         raise NotFoundError("Shared meeting not found")
+    expires = meeting.share_expires_at
+    if expires is not None and (
+        expires if expires.tzinfo else expires.replace(tzinfo=UTC)
+    ) <= datetime.now(UTC):
+        raise GoneError("This share link has expired")
     items = db.scalars(
         select(ActionItem).where(ActionItem.meeting_id == meeting.id).order_by(ActionItem.position)
     )

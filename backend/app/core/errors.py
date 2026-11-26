@@ -39,6 +39,11 @@ class ForbiddenError(AppError):
     code = "forbidden"
 
 
+class GoneError(AppError):
+    status_code = status.HTTP_410_GONE
+    code = "gone"
+
+
 class ConflictError(AppError):
     status_code = status.HTTP_409_CONFLICT
     code = "conflict"

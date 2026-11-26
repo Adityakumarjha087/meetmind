@@ -17,7 +17,12 @@ from app.services import http as http_service
 from tests.conftest import auth, upload_demo
 
 # Built at runtime so no webhook-shaped literal lives in the repository.
-SLACK_URL = "https://" + "hooks.slack.com" + "/services/" + "/".join(["test-team", "test-bot", "test-secret"])
+SLACK_URL = (
+    "https://"
+    + "hooks.slack.com"
+    + "/services/"
+    + "/".join(["test-team", "test-bot", "test-secret"])
+)
 
 
 def _configure_slack(client: TestClient, h: dict[str, str], auto: bool = False) -> None:

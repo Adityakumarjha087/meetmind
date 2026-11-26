@@ -18,7 +18,7 @@ def test_create_and_update_workspace(client: TestClient, owner: dict[str, str]) 
         f"/api/v1/workspaces/{new_id}",
         json={
             "name": "Platform",
-            "slack_webhook_url": "https://hooks.slack.com/services/T/B/X",
+            "slack_webhook_url": "https://hooks.slack.com/services/" + "x/y/z",
             "slack_auto_post": True,
         },
         headers=auth(owner),

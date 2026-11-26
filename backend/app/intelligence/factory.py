@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import httpx2
+
 from app.core.config import Settings
 from app.intelligence.heuristic import HeuristicEngine
 from app.intelligence.llm_engine import LLMEngine
@@ -19,7 +21,9 @@ def build_chat_model(settings: Settings) -> ChatModel | None:
         if not settings.anthropic_api_key:
             raise RuntimeError("LLM_PROVIDER=anthropic requires ANTHROPIC_API_KEY")
         return AnthropicChatModel(
-            anthropic.Anthropic(api_key=settings.anthropic_api_key),
+            anthropic.Anthropic(
+                api_key=settings.anthropic_api_key, timeout=settings.llm_timeout_s, max_retries=2
+            ),
             settings.llm_model or settings.anthropic_model,
         )
     if provider == "openai":
@@ -30,7 +34,12 @@ def build_chat_model(settings: Settings) -> ChatModel | None:
         if not settings.openai_api_key:
             raise RuntimeError("LLM_PROVIDER=openai requires OPENAI_API_KEY")
         return OpenAIChatModel(
-            openai.OpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url),
+            openai.OpenAI(
+                api_key=settings.openai_api_key,
+                base_url=settings.openai_base_url,
+                timeout=settings.llm_timeout_s,
+                max_retries=2,
+            ),
             settings.llm_model or settings.openai_model,
         )
     if provider == "gemini":
@@ -38,7 +47,11 @@ def build_chat_model(settings: Settings) -> ChatModel | None:
 
         if not settings.gemini_api_key:
             raise RuntimeError("LLM_PROVIDER=gemini requires GEMINI_API_KEY")
-        return GeminiChatModel(settings.gemini_api_key, settings.llm_model or settings.gemini_model)
+        return GeminiChatModel(
+            settings.gemini_api_key,
+            settings.llm_model or settings.gemini_model,
+            client=httpx2.Client(timeout=settings.llm_timeout_s),
+        )
     if provider == "ollama":
         from app.llm.http_providers import OllamaChatModel
 

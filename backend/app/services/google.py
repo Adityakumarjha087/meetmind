@@ -135,8 +135,11 @@ def _valid_access_token(db: Session, account: OAuthAccount) -> str:
     if account.access_token and expires and expires > datetime.now(UTC) + timedelta(seconds=60):
         return account.access_token
     if not account.refresh_token:
-        raise AuthError("Google session expired - reconnect Google Calendar")
-    tokens = _token_request({"refresh_token": account.refresh_token, "grant_type": "refresh_token"})
+        raise ValidationFailed("Google session expired - reconnect Google Calendar")
+    try:
+        tokens = _token_request({"refresh_token": account.refresh_token, "grant_type": "refresh_token"})
+    except AuthError as exc:  # revoked/expired grant: the user must re-consent, not re-login
+        raise ValidationFailed("Google session expired - reconnect Google Calendar") from exc
     account.access_token = tokens["access_token"]
     account.expires_at = datetime.now(UTC) + timedelta(seconds=int(tokens.get("expires_in", 3600)))
     db.flush()

@@ -77,6 +77,11 @@ class Meeting(IdMixin, TimestampMixin, Base):
     # AI outputs (validated against app.schemas.insights.Insights before being stored)
     insights: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     share_token: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    share_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Identifies the pipeline run that currently owns this meeting (concurrency / crash recovery).
+    pipeline_run_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     speakers: Mapped[list[Speaker]] = relationship(
         back_populates="meeting", cascade="all, delete-orphan", order_by="Speaker.label"

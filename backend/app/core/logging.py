@@ -4,8 +4,20 @@ from __future__ import annotations
 
 import logging
 import sys
+from collections.abc import MutableMapping
+from typing import Any
 
 import structlog
+
+SENSITIVE_KEYS = ("password", "token", "secret", "authorization", "api_key", "cookie", "webhook")
+
+
+def redact(_: object, __: str, event: MutableMapping[str, Any]) -> MutableMapping[str, Any]:
+    """structlog processor: never let credentials reach the log stream."""
+    for key in list(event):
+        if any(s in key.lower() for s in SENSITIVE_KEYS):
+            event[key] = "[REDACTED]"
+    return event
 
 
 def configure_logging(level: str = "INFO", json_logs: bool = True) -> None:
@@ -15,6 +27,7 @@ def configure_logging(level: str = "INFO", json_logs: bool = True) -> None:
         structlog.stdlib.add_logger_name,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         structlog.processors.StackInfoRenderer(),
+        redact,
     ]
     renderer: structlog.types.Processor = (
         structlog.processors.JSONRenderer() if json_logs else structlog.dev.ConsoleRenderer()

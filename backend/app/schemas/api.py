@@ -167,9 +167,14 @@ class ProgressOut(BaseModel):
     error: str | None
 
 
+class ShareIn(BaseModel):
+    expires_in_days: int | None = Field(default=None, ge=1, le=365)
+
+
 class ShareOut(BaseModel):
     share_token: str
     share_url: str
+    expires_at: datetime | None = None
 
 
 class PublicMeetingOut(BaseModel):

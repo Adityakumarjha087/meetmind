@@ -46,6 +46,14 @@ def create_app(sio: socketio.AsyncServer | None = None) -> FastAPI:
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         if sio is not None and not settings.redis_url:
             set_emitter(LoopEmitter(sio, asyncio.get_running_loop()))
+        if settings.task_always_eager or not settings.redis_url:
+            # No separate worker in this mode: the API process owns crash recovery.
+            from app.services.dispatch import recover_and_requeue
+
+            try:
+                recover_and_requeue()
+            except Exception:  # never block startup (e.g. tables not migrated yet)
+                log.warning("startup_recovery_skipped")
         log.info(
             "startup",
             environment=settings.environment,

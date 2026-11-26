@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     whisper_compute_type: str = "int8"
     hf_token: str | None = None
     max_speakers: int = 6
-    diarizer_threshold: float = 1.7
+    diarizer_threshold: float = 2.2
 
     # --- LLM ---
     llm_provider: LLMProviderName = "offline"
@@ -84,6 +84,8 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.0-flash"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.1"
+    llm_timeout_s: float = 120.0
+    llm_fallback_offline: bool = True  # degrade to the offline engine if the LLM provider fails
     long_meeting_threshold_s: float = 3600.0
     map_chunk_s: float = 600.0
 
@@ -126,6 +128,12 @@ class Settings(BaseSettings):
         }
     )
 
+    # --- pipeline robustness ---
+    pipeline_stale_after_s: float = (
+        3600.0  # a 'processing' meeting with no heartbeat for this long is reclaimable
+    )
+    share_link_default_days: int = 30
+
     # --- demo ---
     seed_demo: bool = False
 
@@ -142,6 +150,17 @@ class Settings(BaseSettings):
             raise ValueError("JWT_SECRET must be set in production")
         if len(self.jwt_secret) < 32:
             raise ValueError("JWT_SECRET must be at least 32 characters")
+        required = {
+            "anthropic": self.anthropic_api_key,
+            "openai": self.openai_api_key,
+            "gemini": self.gemini_api_key,
+        }
+        if self.llm_provider in required and not required[self.llm_provider]:
+            raise ValueError(f"LLM_PROVIDER={self.llm_provider} requires its API key to be set")
+        if self.storage_backend == "s3" and not (self.s3_access_key and self.s3_secret_key):
+            raise ValueError("STORAGE_BACKEND=s3 requires S3_ACCESS_KEY and S3_SECRET_KEY")
+        if self.environment == "production" and "*" in self.cors_origins:
+            raise ValueError("Wildcard CORS origins are not allowed in production")
         return self
 
     @property

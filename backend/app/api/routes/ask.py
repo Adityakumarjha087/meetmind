@@ -6,8 +6,11 @@ from fastapi import APIRouter, Query
 
 from app.api.deps import DB, CurrentUser
 from app.core.config import get_settings
+from app.core.errors import IntegrationError
 from app.embeddings.factory import build_embedder
 from app.intelligence.factory import build_engine
+from app.intelligence.heuristic import HeuristicEngine
+from app.llm.base import LLMError
 from app.models import Role
 from app.schemas.api import AskIn, AskOut, CitationOut, SearchHitOut
 from app.services.access import require_role
@@ -23,9 +26,20 @@ def ask(workspace_id: str, body: AskIn, user: CurrentUser, db: DB) -> AskOut:
     require_role(db, user, workspace_id, Role.VIEWER)
     settings = get_settings()
     engine = build_engine(settings)
-    result, contexts = answer_question(
-        db, engine, build_embedder(settings), workspace_id, body.question, body.meeting_id
-    )
+    embedder = build_embedder(settings)
+    try:
+        result, contexts = answer_question(
+            db, engine, embedder, workspace_id, body.question, body.meeting_id
+        )
+    except LLMError as exc:
+        if not settings.llm_fallback_offline:
+            raise IntegrationError(
+                "The AI provider is unavailable, please try again later"
+            ) from exc
+        engine = HeuristicEngine()
+        result, contexts = answer_question(
+            db, engine, embedder, workspace_id, body.question, body.meeting_id
+        )
     record_llm_usage(db, settings, workspace_id, None, result.usage)
     db.commit()
     by_index = {c.index: c for c in contexts}

@@ -24,11 +24,16 @@ def validate_webhook_url(url: str) -> str:
     return url
 
 
+def esc(text: str) -> str:
+    """Escape Slack mrkdwn control characters so transcript text can't inject mentions or links."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def build_blocks(
     meeting: Meeting, items: list[ActionItem], share_url: str | None
 ) -> dict[str, Any]:
     insights = insights_of(meeting)
-    summary = insights.executive_summary if insights else "Summary not available yet."
+    summary = esc(insights.executive_summary) if insights else "Summary not available yet."
     blocks: list[dict[str, Any]] = [
         {
             "type": "header",
@@ -37,16 +42,16 @@ def build_blocks(
         {"type": "section", "text": {"type": "mrkdwn", "text": summary[:2900]}},
     ]
     if insights and insights.decisions:
-        text = "\n".join(f"• {d.text}" for d in insights.decisions[:10])
+        text = "\n".join(f"• {esc(d.text)}" for d in insights.decisions[:10])
         blocks.append(
             {"type": "section", "text": {"type": "mrkdwn", "text": f"*Decisions*\n{text}"[:2900]}}
         )
     if items:
         lines = []
         for it in items[:15]:
-            owner = f" — _{it.owner_name}_" if it.owner_name else ""
+            owner = f" — _{esc(it.owner_name)}_" if it.owner_name else ""
             due = f" (due {it.due_date.isoformat()})" if it.due_date else ""
-            lines.append(f"• {it.title}{owner}{due}")
+            lines.append(f"• {esc(it.title)}{owner}{due}")
         blocks.append(
             {
                 "type": "section",

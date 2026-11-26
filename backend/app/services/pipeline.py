@@ -12,22 +12,25 @@ import tempfile
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import delete
+from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
+from app.db.base import new_id
 from app.db.session import session_scope
 from app.embeddings.base import Embedder
 from app.embeddings.factory import build_embedder
 from app.intelligence.factory import build_engine
+from app.intelligence.heuristic import HeuristicEngine
 from app.intelligence.summarizer import summarize
 from app.intelligence.types import AnalysisInput, InsightEngine, LLMUsage, TranscriptLine
+from app.llm.base import LLMError
 from app.models import (
     ActionItem,
     ActionStatus,
@@ -126,10 +129,14 @@ def _emit(deps: PipelineDeps, meeting: Meeting) -> None:
 
 
 def _set_stage(
-    deps: PipelineDeps, meeting_id: str, stage: PipelineStage, message: str | None = None
+    deps: PipelineDeps,
+    meeting_id: str,
+    stage: PipelineStage,
+    message: str | None = None,
+    run_id: str | None = None,
 ) -> None:
     with deps.session_factory() as db:
-        meeting = db.get(Meeting, meeting_id)
+        meeting = _owned(db, meeting_id, run_id) if run_id else db.get(Meeting, meeting_id)
         if meeting is None:
             return
         meeting.stage = stage
@@ -196,10 +203,83 @@ def _speaker_names(labelled: list[LabelledSegment], hints: dict[str, str]) -> di
     return names
 
 
+class Superseded(RuntimeError):
+    """Another pipeline run claimed this meeting (e.g. after crash recovery); stop quietly."""
+
+
+def _claim(deps: PipelineDeps, meeting_id: str, run_id: str) -> bool:
+    """Atomically take ownership of a queued (or stale processing) meeting.
+
+    The conditional UPDATE makes concurrent deliveries of the same job safe: exactly one
+    run wins, the others see rowcount == 0 and exit without touching the meeting.
+    """
+    stale_before = datetime.now(UTC) - timedelta(seconds=deps.settings.pipeline_stale_after_s)
+    with deps.session_factory() as db:
+        result = db.execute(
+            update(Meeting)
+            .where(
+                Meeting.id == meeting_id,
+                Meeting.audio_key.is_not(None),
+                or_(
+                    Meeting.status.in_([MeetingStatus.QUEUED, MeetingStatus.FAILED]),
+                    and_(
+                        Meeting.status == MeetingStatus.PROCESSING,
+                        Meeting.updated_at < stale_before,
+                    ),
+                ),
+            )
+            .values(
+                status=MeetingStatus.PROCESSING,
+                pipeline_run_id=run_id,
+                updated_at=datetime.now(UTC),
+            )
+            .execution_options(synchronize_session=False)
+        )
+        return bool(getattr(result, "rowcount", 0) == 1)
+
+
+def _owned(db: Session, meeting_id: str, run_id: str) -> Meeting:
+    m = db.get(Meeting, meeting_id)
+    if m is None or m.pipeline_run_id != run_id:
+        raise Superseded(meeting_id)
+    return m
+
+
+def recover_stale_meetings(session_factory: Callable[[], Any] = session_scope) -> list[str]:
+    """Re-queue meetings whose worker died mid-pipeline (no heartbeat within the stale window)."""
+    settings = get_settings()
+    stale_before = datetime.now(UTC) - timedelta(seconds=settings.pipeline_stale_after_s)
+    with session_factory() as db:
+        ids = list(
+            db.scalars(
+                select(Meeting.id).where(
+                    Meeting.status == MeetingStatus.PROCESSING, Meeting.updated_at < stale_before
+                )
+            )
+        )
+        if ids:
+            db.execute(
+                update(Meeting)
+                .where(Meeting.id.in_(ids))
+                .values(
+                    status=MeetingStatus.QUEUED,
+                    stage=PipelineStage.QUEUED,
+                    progress=0,
+                    status_message="Re-queued after an interrupted run",
+                    pipeline_run_id=None,
+                )
+                .execution_options(synchronize_session=False)
+            )
+    if ids:
+        log.warning("pipeline_recovered_stale", meetings=ids)
+    return ids
+
+
 def run_pipeline(meeting_id: str, deps: PipelineDeps | None = None) -> None:
     deps = deps or default_deps()
     timings: dict[str, float] = {}
     started = datetime.now(UTC)
+    run_id = new_id()
     with deps.session_factory() as db:
         meeting = db.get(Meeting, meeting_id)
         if meeting is None:
@@ -207,9 +287,14 @@ def run_pipeline(meeting_id: str, deps: PipelineDeps | None = None) -> None:
             return
         if not meeting.audio_key:
             meeting.status = MeetingStatus.FAILED
+            meeting.stage = PipelineStage.FAILED
             meeting.error = "No audio attached to this meeting"
             return
-        meeting.status = MeetingStatus.PROCESSING
+    if not _claim(deps, meeting_id, run_id):
+        log.info("pipeline_skip_not_claimable", meeting_id=meeting_id)
+        return
+    with deps.session_factory() as db:
+        meeting = _owned(db, meeting_id, run_id)
         meeting.error = None
         meeting.processing_started_at = started
         meeting.processing_finished_at = None
@@ -218,6 +303,7 @@ def run_pipeline(meeting_id: str, deps: PipelineDeps | None = None) -> None:
         meeting.llm_provider = deps.engine.name
         workspace_id = meeting.workspace_id
         audio_key = meeting.audio_key
+        assert audio_key is not None  # guaranteed by _claim
         sidecar_key = meeting.sidecar_key
         title = meeting.title
         meeting_date: date = (meeting.scheduled_at or meeting.created_at or started).date()
@@ -228,7 +314,7 @@ def run_pipeline(meeting_id: str, deps: PipelineDeps | None = None) -> None:
         with tempfile.TemporaryDirectory(prefix="meetmind-") as tmp:
             tmpdir = Path(tmp)
             # 1. normalise -------------------------------------------------------------
-            _set_stage(deps, meeting_id, PipelineStage.NORMALIZE)
+            _set_stage(deps, meeting_id, PipelineStage.NORMALIZE, run_id=run_id)
             t0 = time.perf_counter()
             src = deps.storage.download(audio_key, tmpdir / f"original{Path(original_name).suffix}")
             sha = hashlib.sha256(src.read_bytes()).hexdigest()
@@ -240,8 +326,7 @@ def run_pipeline(meeting_id: str, deps: PipelineDeps | None = None) -> None:
             peaks = compute_peaks(audio.samples)
             timings["normalize"] = time.perf_counter() - t0
             with deps.session_factory() as db:
-                m = db.get(Meeting, meeting_id)
-                assert m is not None
+                m = _owned(db, meeting_id, run_id)
                 m.normalized_key = norm_key
                 m.duration_s = round(audio.duration_s, 3)
                 m.waveform_peaks = peaks
@@ -254,7 +339,7 @@ def run_pipeline(meeting_id: str, deps: PipelineDeps | None = None) -> None:
             )
 
             # 2. transcribe ------------------------------------------------------------
-            _set_stage(deps, meeting_id, PipelineStage.TRANSCRIBE)
+            _set_stage(deps, meeting_id, PipelineStage.TRANSCRIBE, run_id=run_id)
             t0 = time.perf_counter()
             sidecar_text = (
                 deps.storage.get_bytes(sidecar_key).decode("utf-8", "replace")
@@ -272,18 +357,19 @@ def run_pipeline(meeting_id: str, deps: PipelineDeps | None = None) -> None:
             timings["transcribe"] = time.perf_counter() - t0
 
             # 3. diarize ---------------------------------------------------------------
-            _set_stage(deps, meeting_id, PipelineStage.DIARIZE)
+            _set_stage(deps, meeting_id, PipelineStage.DIARIZE, run_id=run_id)
             t0 = time.perf_counter()
             turns = deps.diarizer.diarize(audio, normalized)
             timings["diarize"] = time.perf_counter() - t0
 
         # 4. merge -----------------------------------------------------------------------
-        _set_stage(deps, meeting_id, PipelineStage.MERGE)
+        _set_stage(deps, meeting_id, PipelineStage.MERGE, run_id=run_id)
         t0 = time.perf_counter()
         labelled = assign_speakers(pieces, turns)
         names = _speaker_names(labelled, speaker_name_hints(pieces, labelled))
         lines = [TranscriptLine(s.start, s.end, names[s.speaker], s.text) for s in labelled]
         with deps.session_factory() as db:
+            _owned(db, meeting_id, run_id)
             db.execute(delete(TranscriptSegment).where(TranscriptSegment.meeting_id == meeting_id))
             db.execute(delete(Speaker).where(Speaker.meeting_id == meeting_id))
             speakers: dict[str, Speaker] = {}
@@ -336,18 +422,32 @@ def run_pipeline(meeting_id: str, deps: PipelineDeps | None = None) -> None:
         timings["merge"] = time.perf_counter() - t0
 
         # 5. summarise -------------------------------------------------------------------
-        _set_stage(deps, meeting_id, PipelineStage.SUMMARIZE)
+        _set_stage(deps, meeting_id, PipelineStage.SUMMARIZE, run_id=run_id)
         t0 = time.perf_counter()
-        result = summarize(
-            deps.engine,
-            AnalysisInput(title, meeting_date, lines),
-            long_threshold_s=deps.settings.long_meeting_threshold_s,
-            chunk_s=deps.settings.map_chunk_s,
-        )
+        analysis = AnalysisInput(title, meeting_date, lines)
+        fallback_note: str | None = None
+        try:
+            result = summarize(
+                deps.engine,
+                analysis,
+                long_threshold_s=deps.settings.long_meeting_threshold_s,
+                chunk_s=deps.settings.map_chunk_s,
+            )
+        except LLMError as exc:
+            if not deps.settings.llm_fallback_offline:
+                raise
+            log.warning("llm_failed_falling_back", meeting_id=meeting_id, error=str(exc))
+            fallback_note = f"AI provider failed ({exc}); notes generated by the offline engine"
+            result = summarize(
+                HeuristicEngine(),
+                analysis,
+                long_threshold_s=deps.settings.long_meeting_threshold_s,
+                chunk_s=deps.settings.map_chunk_s,
+            )
+            result.insights.engine = "offline (fallback)"
         timings["summarize"] = time.perf_counter() - t0
         with deps.session_factory() as db:
-            m = db.get(Meeting, meeting_id)
-            assert m is not None
+            m = _owned(db, meeting_id, run_id)
             m.insights = result.insights.model_dump(mode="json")
             db.execute(delete(ActionItem).where(ActionItem.meeting_id == meeting_id))
             for pos, item in enumerate(result.insights.action_items):
@@ -366,12 +466,13 @@ def run_pipeline(meeting_id: str, deps: PipelineDeps | None = None) -> None:
             record_llm_usage(db, deps.settings, workspace_id, meeting_id, result.usage)
 
         # 6. index -----------------------------------------------------------------------
-        _set_stage(deps, meeting_id, PipelineStage.INDEX)
+        _set_stage(deps, meeting_id, PipelineStage.INDEX, run_id=run_id)
         t0 = time.perf_counter()
         chunks = build_chunks(lines, deps.settings.chunk_target_words)
         texts = [" ".join(f"{ln.speaker}: {ln.text}" for ln in ch) for ch in chunks]
         vectors = deps.embedder.embed(texts) if texts else []
         with deps.session_factory() as db:
+            _owned(db, meeting_id, run_id)
             db.execute(delete(TranscriptChunk).where(TranscriptChunk.meeting_id == meeting_id))
             for ch, text, vec in zip(chunks, texts, vectors, strict=True):
                 db.add(
@@ -399,12 +500,11 @@ def run_pipeline(meeting_id: str, deps: PipelineDeps | None = None) -> None:
 
         # 7. done ------------------------------------------------------------------------
         with deps.session_factory() as db:
-            m = db.get(Meeting, meeting_id)
-            assert m is not None
+            m = _owned(db, meeting_id, run_id)
             m.status = MeetingStatus.COMPLETED
             m.stage = PipelineStage.DONE
             m.progress = 100
-            m.status_message = STAGE_MESSAGES[PipelineStage.DONE]
+            m.status_message = fallback_note or STAGE_MESSAGES[PipelineStage.DONE]
             m.processing_finished_at = datetime.now(UTC)
             m.stage_timings = {k: round(v, 4) for k, v in timings.items()}
             db.flush()
@@ -414,11 +514,13 @@ def run_pipeline(meeting_id: str, deps: PipelineDeps | None = None) -> None:
         log.info("pipeline_done", meeting_id=meeting_id, timings=timings)
         if auto_slack:
             _auto_post_slack(meeting_id)
+    except Superseded:
+        log.warning("pipeline_superseded", meeting_id=meeting_id, run_id=run_id)
     except Exception as exc:
         log.exception("pipeline_failed", meeting_id=meeting_id)
         with deps.session_factory() as db:
             m = db.get(Meeting, meeting_id)
-            if m is not None:
+            if m is not None and m.pipeline_run_id == run_id:
                 m.status = MeetingStatus.FAILED
                 m.stage = PipelineStage.FAILED
                 m.error = str(exc)[:2000] or exc.__class__.__name__

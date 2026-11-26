@@ -21,3 +21,20 @@ def enqueue_pipeline(meeting_id: str, background: BackgroundTasks) -> str:
     process_meeting.delay(meeting_id)
     log.info("pipeline_enqueued", meeting_id=meeting_id)
     return "celery"
+
+
+def recover_and_requeue() -> list[str]:
+    """Crash recovery: re-queue meetings orphaned by a dead worker and hand them back out."""
+    import threading
+
+    from app.services.pipeline import recover_stale_meetings, run_pipeline
+
+    ids = recover_stale_meetings()
+    for meeting_id in ids:
+        if get_settings().task_always_eager or not get_settings().redis_url:
+            threading.Thread(target=run_pipeline, args=(meeting_id,), daemon=True).start()
+        else:
+            from app.worker import process_meeting
+
+            process_meeting.delay(meeting_id)
+    return ids

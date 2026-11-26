@@ -3,7 +3,7 @@ from __future__ import annotations
 import contextlib
 import re
 import tempfile
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -13,7 +13,13 @@ from sqlalchemy import func, or_, select
 
 from app.api.deps import DB, CurrentUser
 from app.core.config import get_settings
-from app.core.errors import AuthError, NotFoundError, PayloadTooLarge, ValidationFailed
+from app.core.errors import (
+    AuthError,
+    ConflictError,
+    NotFoundError,
+    PayloadTooLarge,
+    ValidationFailed,
+)
 from app.core.security import create_token, decode_token, random_token
 from app.models import (
     ActionItem,
@@ -32,6 +38,7 @@ from app.schemas.api import (
     MeetingUpdate,
     ProgressOut,
     SegmentOut,
+    ShareIn,
     ShareOut,
     SpeakerOut,
     SpeakerUpdate,
@@ -310,8 +317,16 @@ def reprocess(
     meeting = meeting_for(db, user, meeting_id, Role.MEMBER)
     if not meeting.audio_key:
         raise ValidationFailed("Meeting has no audio")
-    if meeting.status in {MeetingStatus.PROCESSING, MeetingStatus.QUEUED}:
-        raise ValidationFailed("Meeting is already queued or processing")
+    stale_before = datetime.now(UTC) - timedelta(seconds=get_settings().pipeline_stale_after_s)
+    updated = (
+        meeting.updated_at if meeting.updated_at.tzinfo else meeting.updated_at.replace(tzinfo=UTC)
+    )
+    in_flight = (
+        meeting.status in {MeetingStatus.PROCESSING, MeetingStatus.QUEUED}
+        and updated > stale_before
+    )
+    if in_flight:
+        raise ConflictError("Meeting is already queued or processing")
     meeting.status, meeting.stage, meeting.progress = MeetingStatus.QUEUED, PipelineStage.QUEUED, 0
     meeting.status_message = "Queued for reprocessing"
     db.commit()
@@ -425,22 +440,39 @@ def export_meeting(
 
 
 @router.post("/meetings/{meeting_id}/share", response_model=ShareOut)
-def share(meeting_id: str, user: CurrentUser, db: DB) -> ShareOut:
+def share(meeting_id: str, user: CurrentUser, db: DB, body: ShareIn | None = None) -> ShareOut:
+    """Create (or extend) a read-only share link. Links expire; revoke with DELETE."""
     meeting = meeting_for(db, user, meeting_id, Role.MEMBER)
     if meeting.status != MeetingStatus.COMPLETED:
         raise ValidationFailed("Only processed meetings can be shared")
-    if not meeting.share_token:
+    days = (
+        body.expires_in_days
+        if body and body.expires_in_days
+        else get_settings().share_link_default_days
+    )
+    expired = meeting.share_expires_at is not None and _aware(
+        meeting.share_expires_at
+    ) <= datetime.now(UTC)
+    if not meeting.share_token or expired:
         meeting.share_token = random_token(24)
-        db.commit()
+    meeting.share_expires_at = datetime.now(UTC) + timedelta(days=days)
+    db.commit()
     url = share_url_for(meeting)
-    assert url is not None
-    return ShareOut(share_token=meeting.share_token, share_url=url)
+    assert url is not None and meeting.share_token is not None
+    return ShareOut(
+        share_token=meeting.share_token, share_url=url, expires_at=meeting.share_expires_at
+    )
+
+
+def _aware(dt: datetime) -> datetime:
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 @router.delete("/meetings/{meeting_id}/share", status_code=204)
 def unshare(meeting_id: str, user: CurrentUser, db: DB) -> Response:
     meeting = meeting_for(db, user, meeting_id, Role.MEMBER)
     meeting.share_token = None
+    meeting.share_expires_at = None
     db.commit()
     return Response(status_code=204)
 
