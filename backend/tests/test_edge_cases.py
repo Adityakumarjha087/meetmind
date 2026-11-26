@@ -515,7 +515,7 @@ def test_prompt_injection_is_contained(client: TestClient, owner: dict[str, str]
         items = list(db.scalars(select(ActionItem).where(ActionItem.meeting_id == m["id"])))
         payload = json.dumps(
             build_blocks(
-                meeting, items + [ActionItem(workspace_id="w", title="<!channel> ping")], None
+                meeting, [*items, ActionItem(workspace_id="w", title="<!channel> ping")], None
             )
         )
     assert "<!channel>" not in payload and "&lt;!channel&gt;" in payload

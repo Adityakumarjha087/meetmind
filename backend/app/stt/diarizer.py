@@ -18,7 +18,9 @@ from app.stt.features import frame_energy_db, frame_pitch, frame_signal, log_mel
 from app.stt.vad import SpeechRegion, detect_speech
 
 Matrix = npt.NDArray[np.float64]
-PITCH_SCALE = 80.0  # per unit of log-F0 (~3.5 semitones -> 16 units); calibrated, see docs/DECISIONS.md
+PITCH_SCALE = (
+    80.0  # per unit of log-F0 (~3.5 semitones -> 16 units); calibrated, see docs/DECISIONS.md
+)
 
 
 @dataclass(frozen=True)
