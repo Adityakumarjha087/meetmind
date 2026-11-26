@@ -1,0 +1,94 @@
+{
+ "segments": [
+  {
+   "start": 0.8,
+   "end": 6.56,
+   "speaker": "Dana",
+   "text": "Morning team, this is the weekly engineering sync. Let's go through the search latency work first."
+  },
+  {
+   "start": 7.16,
+   "end": 13.28,
+   "speaker": "Leo",
+   "text": "The new caching layer cut search latency from four hundred milliseconds to ninety milliseconds at the median."
+  },
+  {
+   "start": 13.88,
+   "end": 17.48,
+   "speaker": "Dana",
+   "text": "That's great progress. Are we seeing any cache invalidation issues?"
+  },
+  {
+   "start": 18.08,
+   "end": 26.36,
+   "speaker": "Leo",
+   "text": "One issue in staging where stale results showed for about a minute. I will add an invalidation hook on product updates by Thursday."
+  },
+  {
+   "start": 26.96,
+   "end": 34.88,
+   "speaker": "Mia",
+   "text": "On the infrastructure side, the Postgres upgrade to version sixteen is scheduled. I'm worried about the replication lag we saw last time."
+  },
+  {
+   "start": 35.48,
+   "end": 43.04,
+   "speaker": "Dana",
+   "text": "Good point. We decided to run the upgrade on the read replica first and promote it after a day of monitoring."
+  },
+  {
+   "start": 43.64,
+   "end": 48.32,
+   "speaker": "Mia",
+   "text": "Sounds good. I will write the runbook for the replica upgrade by tomorrow."
+  },
+  {
+   "start": 48.92,
+   "end": 51.8,
+   "speaker": "Leo",
+   "text": "Should we also bump the connection pool size?"
+  },
+  {
+   "start": 52.4,
+   "end": 57.8,
+   "speaker": "Dana",
+   "text": "I don't know yet, let's revisit that after we see the metrics from the replica."
+  },
+  {
+   "start": 58.4,
+   "end": 63.08,
+   "speaker": "Dana",
+   "text": "Mia, can you share the load test results with the team by Friday?"
+  },
+  {
+   "start": 63.68,
+   "end": 65.48,
+   "speaker": "Mia",
+   "text": "Yes, I can do that."
+  },
+  {
+   "start": 66.08,
+   "end": 71.84,
+   "speaker": "Leo",
+   "text": "The flaky checkout test is still failing about five percent of the time, which is frustrating."
+  },
+  {
+   "start": 72.44,
+   "end": 80.36,
+   "speaker": "Dana",
+   "text": "We agreed to quarantine flaky tests and track them on the board. Leo, please create a ticket for the checkout test today."
+  },
+  {
+   "start": 80.96,
+   "end": 82.56,
+   "speaker": "Leo",
+   "text": "Will do."
+  },
+  {
+   "start": 83.16,
+   "end": 84.76,
+   "speaker": "Dana",
+   "text": "Great work everyone, thanks."
+  }
+ ]
+}

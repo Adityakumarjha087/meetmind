@@ -1,0 +1,71 @@
+{
+  "name": "demo_meeting",
+  "language": "en",
+  "segments": [
+    {
+      "start": 0.5,
+      "end": 7.88,
+      "text": "Good morning everyone. Let's get started with the Q3 launch planning sync. Our goal today is to lock the launch date and assign owners."
+    },
+    {
+      "start": 8.43,
+      "end": 16.59,
+      "text": "Thanks Priya. Engineering is on track. The mobile app beta passed QA yesterday, but we still have two open bugs in the payment flow."
+    },
+    {
+      "start": 17.14,
+      "end": 19.11,
+      "text": "How long will the payment fixes take?"
+    },
+    {
+      "start": 19.66,
+      "end": 23.35,
+      "text": "About a week. I will fix the payment bugs by next Friday."
+    },
+    {
+      "start": 23.9,
+      "end": 32.01,
+      "text": "From the marketing side, the campaign assets are ready. I am worried the press release depends on the final pricing."
+    },
+    {
+      "start": 32.56,
+      "end": 37.44,
+      "text": "Good point. We decided to keep the pricing at twenty nine dollars per month for the launch."
+    },
+    {
+      "start": 37.99,
+      "end": 44.08,
+      "text": "Great, that unblocks us. I will send the press release draft to the team by Wednesday."
+    },
+    {
+      "start": 44.63,
+      "end": 48.54,
+      "text": "One concern. Do we have enough support staff for launch week?"
+    },
+    {
+      "start": 49.09,
+      "end": 55.89,
+      "text": "I am not sure yet. Let's revisit staffing next week. Marcus, can you update the release checklist by Monday?"
+    },
+    {
+      "start": 56.44,
+      "end": 58.14,
+      "text": "Yes, I can do that."
+    },
+    {
+      "start": 58.69,
+      "end": 64.76,
+      "text": "So we agreed to launch on September fifteenth. Raj, please book the launch webinar by the end of the month."
+    },
+    {
+      "start": 65.31,
+      "end": 70.66,
+      "text": "Will do. This is exciting, I think the team did a fantastic job."
+    },
+    {
+      "start": 71.21,
+      "end": 73.86,
+      "text": "Agreed. Thanks everyone, great meeting."
+    }
+  ]
+}

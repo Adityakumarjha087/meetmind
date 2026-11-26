@@ -1,0 +1,102 @@
+{
+  "audio_sha256": "787890c6826ac45f85bde48a80e522289dce700f49281f23d87aa8005c77e9f4",
+  "duration_s": 74.41,
+  "turns": [
+    {
+      "start": 0.5,
+      "end": 7.88,
+      "speaker": "Priya"
+    },
+    {
+      "start": 8.43,
+      "end": 16.59,
+      "speaker": "Marcus"
+    },
+    {
+      "start": 17.14,
+      "end": 19.11,
+      "speaker": "Priya"
+    },
+    {
+      "start": 19.66,
+      "end": 23.35,
+      "speaker": "Marcus"
+    },
+    {
+      "start": 23.9,
+      "end": 32.01,
+      "speaker": "Raj"
+    },
+    {
+      "start": 32.56,
+      "end": 37.44,
+      "speaker": "Priya"
+    },
+    {
+      "start": 37.99,
+      "end": 44.08,
+      "speaker": "Raj"
+    },
+    {
+      "start": 44.63,
+      "end": 48.54,
+      "speaker": "Marcus"
+    },
+    {
+      "start": 49.09,
+      "end": 55.89,
+      "speaker": "Priya"
+    },
+    {
+      "start": 56.44,
+      "end": 58.14,
+      "speaker": "Marcus"
+    },
+    {
+      "start": 58.69,
+      "end": 64.76,
+      "speaker": "Priya"
+    },
+    {
+      "start": 65.31,
+      "end": 70.66,
+      "speaker": "Raj"
+    },
+    {
+      "start": 71.21,
+      "end": 73.86,
+      "speaker": "Priya"
+    }
+  ],
+  "expected": {
+    "action_items": [
+      {
+        "owner": "Marcus",
+        "title": "fix the payment bugs",
+        "due": "next Friday"
+      },
+      {
+        "owner": "Raj",
+        "title": "send the press release draft",
+        "due": "Wednesday"
+      },
+      {
+        "owner": "Marcus",
+        "title": "update the release checklist",
+        "due": "Monday"
+      },
+      {
+        "owner": "Raj",
+        "title": "book the launch webinar",
+        "due": "end of the month"
+      }
+    ],
+    "decisions": [
+      "pricing at twenty nine dollars per month",
+      "launch on September fifteenth"
+    ],
+    "open_questions": [
+      "enough support staff for launch week"
+    ]
+  }
+}
