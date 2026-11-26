@@ -71,6 +71,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         default_limit: int,
         window_s: int = 60,
         exempt_prefixes: tuple[str, ...] = ("/health", "/socket.io", "/docs", "/openapi.json"),
+        trust_proxy_headers: bool = False,
     ) -> None:
         super().__init__(app)
         self.store = store
@@ -79,6 +80,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.window_s = window_s
         self.exempt = exempt_prefixes
         self._fallback = MemoryCounterStore()
+        self.trust_proxy_headers = trust_proxy_headers
 
     def _rule_for(self, path: str, method: str) -> tuple[str, int]:
         for rule in self.rules:
@@ -93,7 +95,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if request.method == "OPTIONS" or path.startswith(self.exempt):
             return await call_next(request)
         bucket, limit = self._rule_for(path, request.method)
-        client = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
+        # X-Forwarded-For is client-controlled; only honour it behind a trusted proxy.
+        forwarded = request.headers.get("x-forwarded-for", "") if self.trust_proxy_headers else ""
+        client = forwarded.split(",")[0].strip() or (
             request.client.host if request.client else "unknown"
         )
         window = int(time.time() // self.window_s)

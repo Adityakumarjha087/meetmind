@@ -54,7 +54,8 @@ services:
       retries: 20
 
   minio:
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    # Community build of MinIO (upstream no longer publishes images); pinned by digest.
+    image: coollabsio/minio@sha256:69b55a1c1c5dc285ce04db96689f5b2102317fc77a50680a1874ca6efd1c87f9
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-meetmind}
@@ -68,6 +69,7 @@ services:
       retries: 20
 
   backend:
+    image: meetmind-backend:local
     build:
       context: ./backend
       args:
@@ -84,10 +86,7 @@ services:
     restart: unless-stopped
 
   worker:
-    build:
-      context: ./backend
-      args:
-        INSTALL_ML: ${INSTALL_ML:-false}
+    image: meetmind-backend:local  # same image as the API, built by the backend service
     command: ["worker"]
     environment: *backend-env
     depends_on:
@@ -106,6 +105,7 @@ services:
     #       devices: [{ driver: nvidia, count: 1, capabilities: [gpu] }]
 
   frontend:
+    image: meetmind-frontend:local
     build:
       context: ./frontend
       args:

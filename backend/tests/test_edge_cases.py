@@ -645,6 +645,13 @@ def test_rate_limiting_on_login(monkeypatch: pytest.MonkeyPatch) -> None:
         r = c.post("/api/v1/auth/login", json={"email": "x@example.com", "password": "nope"})
         assert r.json()["error"]["code"] == "rate_limited" and r.headers["retry-after"] == "60"
         assert c.get("/health").status_code == 200
+        # spoofing X-Forwarded-For does not reset the budget (proxy headers untrusted by default)
+        spoofed = c.post(
+            "/api/v1/auth/login",
+            json={"email": "x@example.com", "password": "nope"},
+            headers={"X-Forwarded-For": "203.0.113.9"},
+        )
+        assert spoofed.status_code == 429
 
 
 def test_security_headers_and_cors(client: TestClient) -> None:

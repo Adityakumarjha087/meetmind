@@ -380,3 +380,11 @@ def test_pipeline_handles_missing_meeting_and_audio(
     run_pipeline(mid)
     detail = client.get(f"/api/v1/meetings/{mid}", headers=auth(owner)).json()
     assert detail["status"] == "failed" and "No audio" in detail["error"]
+
+
+def test_list_settings_parse_csv_and_json_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CORS_ORIGINS", "http://a.com, http://b.com")
+    monkeypatch.setenv("SLACK_ALLOWED_HOSTS", '["hooks.example.com"]')
+    s = Settings()
+    assert s.cors_origins == ["http://a.com", "http://b.com"]
+    assert s.slack_allowed_hosts == ["hooks.example.com"]

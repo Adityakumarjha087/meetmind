@@ -180,6 +180,8 @@ for _ in $(seq 1 30); do
   [[ "$c" == 429 ]] && LIMITED=1 && break
 done
 check "brute-force login throttled (429)" test "$LIMITED" = 1
+echo "  waiting 61s for the rate-limit window to reset (so follow-up suites can log in)…"
+sleep 61
 
 printf '\n\033[1mSmoke result: %d passed, %d failed\033[0m\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

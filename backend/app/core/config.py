@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 LLMProviderName = Literal["offline", "anthropic", "openai", "gemini", "ollama"]
 STTBackendName = Literal["sidecar", "faster_whisper", "openai_whisper"]
@@ -27,7 +28,9 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
     frontend_url: str = "http://localhost:20700"
     public_api_url: str = "http://localhost:20701"
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:20700"])
+    cors_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["http://localhost:20700"]
+    )
 
     # --- security ---
     jwt_secret: str = DEV_JWT_SECRET
@@ -43,6 +46,7 @@ class Settings(BaseSettings):
     rate_limit_default_per_minute: int = 240
     rate_limit_auth_per_minute: int = 20
     rate_limit_upload_per_minute: int = 20
+    trust_proxy_headers: bool = False  # honour X-Forwarded-For only behind a trusted reverse proxy
 
     # --- database / queue ---
     database_url: str = "sqlite+pysqlite:///./meetmind.db"
@@ -104,7 +108,9 @@ class Settings(BaseSettings):
     google_token_url: str = "https://oauth2.googleapis.com/token"  # noqa: S105
     google_userinfo_url: str = "https://openidconnect.googleapis.com/v1/userinfo"
     google_calendar_base: str = "https://www.googleapis.com/calendar/v3"
-    slack_allowed_hosts: list[str] = Field(default_factory=lambda: ["hooks.slack.com"])
+    slack_allowed_hosts: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["hooks.slack.com"]
+    )
 
     # --- cost model (USD) ---
     cost_stt_per_minute: dict[str, float] = Field(
@@ -140,7 +146,9 @@ class Settings(BaseSettings):
     @field_validator("cors_origins", "slack_allowed_hosts", mode="before")
     @classmethod
     def _split_csv(cls, value: object) -> object:
-        if isinstance(value, str) and not value.strip().startswith("["):
+        if isinstance(value, str):
+            if value.strip().startswith("["):
+                return json.loads(value)
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
 

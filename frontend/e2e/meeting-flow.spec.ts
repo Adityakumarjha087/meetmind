@@ -5,6 +5,7 @@ const DEMO_AUDIO = path.resolve(__dirname, "../../backend/app/seed_data/demo_mee
 
 test("upload a meeting, watch it process, review notes, board and ask", async ({ page }) => {
   const email = `e2e-${Date.now()}@example.com`;
+  const nav = page.getByRole("navigation", { name: "Main", exact: true });
 
   await page.goto("/register");
   await page.getByLabel("Name").fill("E2E Tester");
@@ -27,8 +28,8 @@ test("upload a meeting, watch it process, review notes, board and ask", async ({
   await expect(page.getByText("Ready")).toBeVisible();
   const items = page.getByTestId("action-items").locator("li");
   await expect(items).toHaveCount(4);
-  await expect(page.getByText("Fix the payment bugs")).toBeVisible();
-  await expect(page.getByText(/We decided to keep the pricing/)).toBeVisible();
+  await expect(page.getByText("Fix the payment bugs", { exact: true })).toBeVisible();
+  await expect(page.getByText(/We decided to keep the pricing/).first()).toBeVisible();
 
   // Transcript synced with waveform; rename a speaker
   await page.getByRole("tab", { name: "Transcript" }).click();
@@ -40,21 +41,21 @@ test("upload a meeting, watch it process, review notes, board and ask", async ({
   await expect(page.getByRole("list", { name: "Speakers" }).getByText("Marcus")).toBeVisible();
 
   // Kanban board
-  await page.getByRole("link", { name: "Task board" }).click();
-  await expect(page.getByTestId("column-todo").getByText("Fix the payment bugs")).toBeVisible();
+  await nav.getByRole("link", { name: "Task board", exact: true }).click();
+  await expect(page.getByTestId("column-todo").getByText("Fix the payment bugs", { exact: true })).toBeVisible();
   await page.getByLabel("Status for Fix the payment bugs").selectOption("done");
-  await expect(page.getByTestId("column-done").getByText("Fix the payment bugs")).toBeVisible();
+  await expect(page.getByTestId("column-done").getByText("Fix the payment bugs", { exact: true })).toBeVisible();
 
   // Ask your meetings (RAG with citations)
-  await page.getByRole("link", { name: "Ask" }).click();
-  await page.getByLabel("Question").fill("What did we decide about pricing?");
+  await nav.getByRole("link", { name: "Ask", exact: true }).click();
+  await page.getByLabel("Question", { exact: true }).fill("What did we decide about pricing?");
   await page.getByRole("button", { name: "Send question" }).click();
   const answer = page.getByTestId("answer");
   await expect(answer).toContainText("twenty nine dollars");
-  await expect(answer.getByRole("link", { name: /Source 1: E2E Launch Sync/ })).toBeVisible();
+  await expect(answer.getByRole("link", { name: /Source 1: E2E Launch Sync/ }).first()).toBeVisible();
 
   // Usage dashboard
-  await page.getByRole("link", { name: "Usage" }).click();
+  await nav.getByRole("link", { name: "Usage", exact: true }).click();
   await expect(page.getByText("Minutes transcribed").first()).toBeVisible();
   await expect(page.getByText("1.2").first()).toBeVisible();
 });

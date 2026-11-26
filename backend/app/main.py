@@ -91,6 +91,7 @@ def create_app(sio: socketio.AsyncServer | None = None) -> FastAPI:
                 ),
             ],
             default_limit=settings.rate_limit_default_per_minute,
+            trust_proxy_headers=settings.trust_proxy_headers,
         )
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(

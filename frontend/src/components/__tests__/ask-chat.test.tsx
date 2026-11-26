@@ -43,3 +43,15 @@ describe("AskChat", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests");
   });
 });
+
+describe("AskChat effects", () => {
+  it("does not crash when scrollIntoView returns a Promise (recent Chromium)", async () => {
+    Element.prototype.scrollIntoView = vi.fn(() => Promise.resolve()) as unknown as Element["scrollIntoView"];
+    vi.spyOn(api, "ask").mockResolvedValue({ answer: "ok", citations: [], engine: "offline" });
+    const { unmount } = render(<AskChat workspaceId="w1" />);
+    await userEvent.type(screen.getByLabelText("Question"), "hello there");
+    await userEvent.click(screen.getByRole("button", { name: "Send question" }));
+    expect(await screen.findByTestId("answer")).toHaveTextContent("ok");
+    expect(() => unmount()).not.toThrow();
+  });
+});

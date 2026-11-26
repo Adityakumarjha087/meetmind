@@ -54,7 +54,11 @@ export function AskChat({ workspaceId }: { workspaceId: string }) {
   const [busy, setBusy] = useState(false);
   const end = useRef<HTMLDivElement>(null);
 
-  useEffect(() => end.current?.scrollIntoView?.({ behavior: "smooth", block: "end" }), [turns]);
+  useEffect(() => {
+    // Block body on purpose: Element.scrollIntoView returns a Promise in recent Chromium, and an
+    // effect must return nothing or a cleanup function.
+    void end.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
+  }, [turns]);
 
   async function ask(q: string) {
     const text = q.trim();
