@@ -27,7 +27,7 @@ from app.models import (
 )
 from app.services.accounts import create_user_with_workspace
 from app.services.meetings import rename_speaker
-from app.services.pipeline import run_pipeline
+from app.services.pipeline import regenerate_insights, run_pipeline
 from app.services.storage import get_storage
 from app.services.synth import synthesize
 
@@ -109,6 +109,8 @@ def seed() -> bool:
         if meeting is not None:
             for speaker, name in zip(meeting.speakers, ["Priya", "Marcus", "Raj"], strict=False):
                 rename_speaker(db, meeting, speaker.id, name)
+            # Regenerate notes so the summary and owners use the real names from the start.
+            regenerate_insights(db, meeting)
         items = list(
             db.scalars(
                 select(ActionItem)

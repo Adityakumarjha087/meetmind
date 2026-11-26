@@ -545,3 +545,45 @@ def _auto_post_slack(meeting_id: str) -> None:
 
 def insights_of(meeting: Meeting) -> Insights | None:
     return Insights.model_validate(meeting.insights) if meeting.insights else None
+
+
+def regenerate_insights(
+    db: Session, meeting: Meeting, engine: InsightEngine | None = None
+) -> Insights:
+    """Re-run summarisation on the stored transcript using the *current* speaker names.
+
+    Used after speakers are renamed (e.g. by the demo seed) so generated prose and owners use
+    real names. Replaces the meeting's auto-extracted action items.
+    """
+    settings = get_settings()
+    engine = engine or build_engine(settings)
+    names = {s.id: s.display_name for s in meeting.speakers}
+    lines = [
+        TranscriptLine(seg.start_s, seg.end_s, names.get(seg.speaker_id or "", "Unknown"), seg.text)
+        for seg in meeting.segments
+    ]
+    meeting_date = (meeting.scheduled_at or meeting.created_at).date()
+    result = summarize(
+        engine,
+        AnalysisInput(meeting.title, meeting_date, lines),
+        long_threshold_s=settings.long_meeting_threshold_s,
+        chunk_s=settings.map_chunk_s,
+    )
+    meeting.insights = result.insights.model_dump(mode="json")
+    db.execute(delete(ActionItem).where(ActionItem.meeting_id == meeting.id))
+    for pos, item in enumerate(result.insights.action_items):
+        db.add(
+            ActionItem(
+                workspace_id=meeting.workspace_id,
+                meeting_id=meeting.id,
+                title=item.title,
+                owner_name=item.owner,
+                due_date=item.due_date,
+                status=ActionStatus.TODO,
+                position=float(pos),
+                source_start_s=item.timestamp_s,
+            )
+        )
+    record_llm_usage(db, settings, meeting.workspace_id, meeting.id, result.usage)
+    db.flush()
+    return result.insights

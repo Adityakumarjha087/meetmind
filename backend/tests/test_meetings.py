@@ -114,6 +114,8 @@ def test_rename_speaker_propagates(client: TestClient, owner: dict[str, str]) ->
     assert sum(i["owner_name"] == "Marcus" for i in items) == 2
     detail = client.get(f"/api/v1/meetings/{m['id']}", headers=auth(owner)).json()
     assert "Marcus" in {s["speaker"] for s in detail["insights"]["sentiment"]}
+    assert "Speaker 2" not in detail["insights"]["executive_summary"]
+    assert "Marcus" in detail["insights"]["executive_summary"]
     transcript = client.get(f"/api/v1/meetings/{m['id']}/transcript", headers=auth(owner)).json()
     assert "Marcus" in {t["speaker_name"] for t in transcript}
     assert (

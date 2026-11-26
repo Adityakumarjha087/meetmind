@@ -364,6 +364,9 @@ def test_seed_is_idempotent() -> None:
             "Leo",
             "Mia",
         ]
+        q3_summary = (meetings["Q3 Launch Planning"].insights or {})["executive_summary"]
+        assert "Speaker " not in q3_summary
+        assert "assigned to Marcus, Raj." in q3_summary  # regenerated, not duplicated
 
 
 def test_pipeline_handles_missing_meeting_and_audio(

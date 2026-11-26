@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import re
 from typing import Any
 
 from sqlalchemy import select, update
@@ -38,6 +39,15 @@ def rename_speaker(db: Session, meeting: Meeting, speaker_id: str, new_name: str
         for s in data.get("sentiment", []):
             if s.get("speaker") == old:
                 s["speaker"] = new_name
+        # Generated prose refers to speakers by label too ("assigned to Speaker 2").
+        pattern = re.compile(rf"(?<![\w]){re.escape(old)}(?![\w])")
+        if isinstance(data.get("executive_summary"), str):
+            data["executive_summary"] = pattern.sub(new_name, data["executive_summary"])
+        data["key_points"] = [pattern.sub(new_name, p) for p in data.get("key_points", [])]
+        for key in ("decisions", "open_questions"):
+            for entry in data.get(key, []):
+                if isinstance(entry.get("text"), str):
+                    entry["text"] = pattern.sub(new_name, entry["text"])
         meeting.insights = data
     for chunk in db.scalars(
         select(TranscriptChunk).where(TranscriptChunk.meeting_id == meeting.id)

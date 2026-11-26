@@ -79,6 +79,13 @@ services:
       <<: *backend-env
       SEED_DEMO: ${SEED_DEMO:-true}
     ports: ["20701:8000"]
+    healthcheck:
+      # First boot runs migrations and processes the demo meetings before serving traffic.
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 240s
+      retries: 6
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
