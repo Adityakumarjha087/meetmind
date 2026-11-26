@@ -175,7 +175,7 @@ check "minutes transcribed recorded" test "$(jqb '.totals.minutes_transcribed > 
 
 step "12. Rate limiting"
 LIMITED=0
-for _ in $(seq 1 30); do
+for _ in $(seq 1 45); do  # > 2x the limit, so a fixed-window boundary cannot hide it
   c=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$V1/auth/login" -H 'Content-Type: application/json' -d '{"email":"nobody@example.com","password":"x"}')
   [[ "$c" == 429 ]] && LIMITED=1 && break
 done
