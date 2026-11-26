@@ -68,11 +68,28 @@ flowchart LR
 
 ## Screenshots
 
-> _Placeholders — add screenshots of: meetings list, meeting detail (waveform + transcript), AI notes, task board, Ask chat, usage dashboard (light & dark)._
+All captured from the running Docker stack with the seeded demo data (`node scripts/screenshots.mjs`).
 
-| Meeting detail | Task board | Ask your meetings | Usage |
-|---|---|---|---|
-| `docs/screenshots/meeting.png` | `docs/screenshots/board.png` | `docs/screenshots/ask.png` | `docs/screenshots/usage.png` |
+![Meeting notes](docs/screenshots/meeting-notes.png)
+*AI notes for a processed meeting: executive summary, decisions and open questions with timestamp links, action items with owners and resolved due dates, and per-speaker sentiment.*
+
+![Transcript viewer](docs/screenshots/transcript.png)
+*Speaker-labelled transcript synced to the WaveSurfer waveform; clicking a sentence seeks the audio and highlights it, and speakers can be renamed inline.*
+
+![Task board](docs/screenshots/task-board.png)
+*Kanban board of action items from every meeting, with assignees, overdue badges and links back to the source meeting.*
+
+![Ask your meetings](docs/screenshots/ask.png)
+*"Ask your meetings": RAG answer across all transcripts with numbered, timestamped citations.*
+
+![Usage dashboard](docs/screenshots/usage.png)
+*Usage dashboard: minutes transcribed, processing time per pipeline stage, actual cost and a hosted-API cost projection.*
+
+![Meetings list](docs/screenshots/meetings.png)
+*Workspace meeting list with processing status, including a meeting imported as scheduled.*
+
+![Dark mode](docs/screenshots/meeting-notes-dark.png)
+*Dark mode.*
 
 ## Local setup
 
