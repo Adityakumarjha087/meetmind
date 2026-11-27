@@ -45,7 +45,7 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
         max_age=settings.refresh_token_ttl_days * 86400,
         httponly=True,
         secure=settings.refresh_cookie_secure,
-        samesite="lax",
+        samesite=settings.refresh_cookie_samesite,
         path=f"{settings.api_prefix}/auth",
     )
 
@@ -105,8 +105,13 @@ def logout(request: Request, response: Response, db: DB, body: RefreshIn | None 
         accounts.revoke_refresh_token(db, token)
         db.commit()
     response = Response(status_code=204)
+    settings = get_settings()
     response.delete_cookie(
-        get_settings().refresh_cookie_name, path=f"{get_settings().api_prefix}/auth"
+        settings.refresh_cookie_name,
+        path=f"{settings.api_prefix}/auth",
+        secure=settings.refresh_cookie_secure,
+        httponly=True,
+        samesite=settings.refresh_cookie_samesite,
     )
     return response
 

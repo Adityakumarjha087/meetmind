@@ -28,13 +28,19 @@ from app.models import (
 from app.services.accounts import create_user_with_workspace
 from app.services.meetings import rename_speaker
 from app.services.pipeline import regenerate_insights, run_pipeline
-from app.services.storage import get_storage
+from app.services.storage import StorageError, get_storage
 from app.services.synth import synthesize
 
 log = get_logger("meetmind.seed")
 SEED_DIR = Path(__file__).resolve().parent / "seed_data"
 DEMO_EMAIL = "demo@meetmind.dev"
 DEMO_PASSWORD = "meetmind-demo"  # noqa: S105
+# Seeded meeting title -> (sidecar fixture name or None for the bundled WAV, synth seed).
+SEED_AUDIO = {
+    "Q3 Launch Planning": (None, 0),
+    "Weekly Engineering Sync": ("weekly_engineering_sync", 0),
+    "Customer Feedback Review": ("customer_feedback_review", 1),
+}
 
 
 def _add_meeting(
@@ -67,6 +73,7 @@ def seed() -> bool:
     with session_scope() as db:
         if db.scalar(select(User).where(User.email == DEMO_EMAIL)):
             log.info("seed_skipped", reason="demo user exists")
+            restore_seed_audio()
             return False
         demo = create_user_with_workspace(
             db, email=DEMO_EMAIL, name="Demo User", password=DEMO_PASSWORD
@@ -136,6 +143,44 @@ def seed() -> bool:
         )
     log.info("seed_complete", workspace_id=ws_id)
     return True
+
+
+def restore_seed_audio() -> int:
+    """Re-create seeded recordings missing from storage (e.g. ephemeral disk on free hosting).
+
+    The database survives restarts but a local storage directory may not; the transcript and notes
+    are intact, so only the audio objects (and sidecars) need to be put back for playback.
+    """
+    storage = get_storage()
+    restored = 0
+    with session_scope() as db:
+        seeded = db.scalars(select(Meeting).where(Meeting.source == MeetingSource.SEED)).all()
+        with tempfile.TemporaryDirectory() as tmp:
+            for meeting in seeded:
+                spec = SEED_AUDIO.get(meeting.title)
+                if spec is None or not meeting.audio_key:
+                    continue
+                try:
+                    storage.size(meeting.audio_key)
+                    continue
+                except StorageError:
+                    pass
+                name, synth_seed = spec
+                if name is None:
+                    storage.put_file(meeting.audio_key, SEED_DIR / "demo_meeting.wav", "audio/wav")
+                else:
+                    sidecar = SEED_DIR / f"{name}.json"
+                    audio = Path(tmp) / f"{name}.wav"
+                    synthesize(json.loads(sidecar.read_text())["segments"], audio, seed=synth_seed)
+                    storage.put_file(meeting.audio_key, audio, "audio/wav")
+                    if meeting.sidecar_key:
+                        storage.put_bytes(
+                            meeting.sidecar_key, sidecar.read_bytes(), "application/json"
+                        )
+                restored += 1
+    if restored:
+        log.info("seed_audio_restored", count=restored)
+    return restored
 
 
 if __name__ == "__main__":

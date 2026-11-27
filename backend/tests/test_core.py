@@ -369,6 +369,35 @@ def test_seed_is_idempotent() -> None:
         assert "assigned to Marcus, Raj." in q3_summary  # regenerated, not duplicated
 
 
+def test_seed_restores_missing_audio() -> None:
+    from app.seed import restore_seed_audio, seed
+    from app.services.storage import get_storage
+
+    seed()
+    storage = get_storage()
+    with session_scope() as db:
+        meetings = [m for m in db.scalars(select(Meeting)) if m.audio_key]
+    assert meetings
+    for m in meetings:
+        storage.delete_prefix(m.audio_key)
+    assert restore_seed_audio() == len(meetings)
+    assert all(storage.size(m.audio_key) > 0 for m in meetings)
+    assert restore_seed_audio() == 0
+
+
+def test_database_url_normalisation_and_cookie_guard() -> None:
+    s = Settings(database_url="postgres://u:p@h/db?sslmode=require", jwt_secret="x" * 40)
+    assert s.database_url == "postgresql+psycopg://u:p@h/db?sslmode=require"
+    s = Settings(database_url="postgresql://u:p@h/db", jwt_secret="x" * 40)
+    assert s.database_url.startswith("postgresql+psycopg://")
+    s = Settings(database_url="postgresql+psycopg://u:p@h/db", jwt_secret="x" * 40)
+    assert s.database_url == "postgresql+psycopg://u:p@h/db"
+    with pytest.raises(ValueError):
+        Settings(refresh_cookie_samesite="none", jwt_secret="x" * 40)
+    s = Settings(refresh_cookie_samesite="none", refresh_cookie_secure=True, jwt_secret="x" * 40)
+    assert s.refresh_cookie_samesite == "none"
+
+
 def test_pipeline_handles_missing_meeting_and_audio(
     client: TestClient, owner: dict[str, str]
 ) -> None:

@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     media_token_ttl_minutes: int = 120
     refresh_cookie_name: str = "mm_refresh"
     refresh_cookie_secure: bool = False
+    # "none" is needed when the SPA and the API live on different sites (requires Secure).
+    refresh_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
 
     # --- rate limiting ---
     rate_limit_enabled: bool = True
@@ -50,6 +52,8 @@ class Settings(BaseSettings):
 
     # --- database / queue ---
     database_url: str = "sqlite+pysqlite:///./meetmind.db"
+    db_pool_size: int = 10
+    db_max_overflow: int = 10
     redis_url: str | None = None
     task_always_eager: bool = False
 
@@ -152,6 +156,16 @@ class Settings(BaseSettings):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _normalise_database_url(cls, value: object) -> object:
+        """Hosted Postgres providers hand out ``postgres://``/``postgresql://`` URLs; use psycopg 3."""
+        if isinstance(value, str):
+            for prefix in ("postgres://", "postgresql://"):
+                if value.startswith(prefix):
+                    return "postgresql+psycopg://" + value[len(prefix) :]
+        return value
+
     @model_validator(mode="after")
     def _production_guards(self) -> Settings:
         if self.environment == "production" and self.jwt_secret == DEV_JWT_SECRET:
@@ -167,6 +181,8 @@ class Settings(BaseSettings):
             raise ValueError(f"LLM_PROVIDER={self.llm_provider} requires its API key to be set")
         if self.storage_backend == "s3" and not (self.s3_access_key and self.s3_secret_key):
             raise ValueError("STORAGE_BACKEND=s3 requires S3_ACCESS_KEY and S3_SECRET_KEY")
+        if self.refresh_cookie_samesite == "none" and not self.refresh_cookie_secure:
+            raise ValueError("REFRESH_COOKIE_SAMESITE=none requires REFRESH_COOKIE_SECURE=true")
         if self.environment == "production" and "*" in self.cors_origins:
             raise ValueError("Wildcard CORS origins are not allowed in production")
         return self
