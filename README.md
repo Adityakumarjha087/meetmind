@@ -9,6 +9,18 @@ Everything runs locally with **zero API keys**: speech-to-text, diarization, sum
 embeddings all have deterministic offline backends, and Whisper / pyannote / Claude / GPT / Gemini /
 Ollama are drop-in replacements selected by environment variables.
 
+## Live demo
+
+| | |
+|---|---|
+| **App** | [meetmind-henna.vercel.app](https://meetmind-henna.vercel.app) |
+| **API docs** | [meetmind-api-pf32.onrender.com/docs](https://meetmind-api-pf32.onrender.com/docs) |
+| **Health** | [meetmind-api-pf32.onrender.com/health](https://meetmind-api-pf32.onrender.com/health) |
+| **Demo login** | `demo@meetmind.dev` / `meetmind-demo` |
+
+> Hosted on free tiers (Vercel + Render + Neon Postgres). The backend sleeps after 15 minutes idle, so the
+> first request can take about a minute — open the health link first. Demo limits: Whisper/pyannote don't fit the free instance — offline transcript backend and summariser; processing runs inline.
+
 ## Features
 
 - **Capture** — upload audio/video (WAV, MP3, M4A, WebM, MP4, MOV, …) or record in the browser (MediaRecorder); optional transcript sidecar (VTT/SRT/JSON/TXT).
